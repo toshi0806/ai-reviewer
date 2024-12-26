@@ -50,13 +50,13 @@ async function runReviewBotVercelAI() {
             .join('\n\n');
 
         const userPrompt = `
-        You're a sophisticated software engineer
-        Please check the code changes in the following Pull Request and point out any potential problems or areas for improvement.
-        Your review MUST written in ${LANGUAGE}
-        Pull Request Title: ${prData.title}
-        Pull Request Body: ${prData.body}
+You're a sophisticated software engineer
+Please check the code changes in the following Pull Request and point out any potential problems or areas for improvement.
+Your review MUST written in ${LANGUAGE}
+Pull Request Title: ${prData.title}
+Pull Request Body: ${prData.body}
 
-        Diffs:
+Diffs:
         ${diffText}
 `;
         console.log("--- Prompt ---")
