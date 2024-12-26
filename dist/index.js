@@ -8,16 +8,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-const dotenv_1 = __importDefault(require("dotenv"));
 const ai_1 = require("ai");
 const google_1 = require("@ai-sdk/google");
 const rest_1 = require("@octokit/rest");
-dotenv_1.default.config();
-// 1. 環境変数の取得
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OWNER = process.env.GITHUB_OWNER || 'your-github-owner';
