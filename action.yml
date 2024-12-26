@@ -20,11 +20,11 @@ runs:
         node-version: 22
 
     - name: Install dependencies
-      run: npm install
+      run: cd ${GITHUB_ACTION_PATH} && npm install
       shell: bash
 
     - name: Run review bot
-      run: node dist/index.js
+      run: cd ${GITHUB_ACTION_PATH} && node dist/index.js
       shell: bash
       env:
         GEMINI_API_KEY: ${{ inputs.GEMINI_API_KEY }}
