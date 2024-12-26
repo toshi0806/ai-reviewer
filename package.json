@@ -17,6 +17,7 @@
   "dependencies": {
     "@ai-sdk/google": "^1.0.12",
     "@octokit/rest": "^21.0.2",
-    "ai": "^4.0.22"
+    "ai": "^4.0.22",
+    "minimatch": "^10.0.1"
   }
 }

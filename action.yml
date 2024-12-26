@@ -9,7 +9,17 @@ inputs:
     default: ""
   GITHUB_TOKEN:
     description: "GitHub Token"
+    required: true
+  MODEL_CODE:
+    description: "Model code for Gemini"
+    default: "models/gemini-2.0-flash-exp"
+  LANGUAGE:
+    description: "Preferred language for review comments"
+    default: "English"
+  EXCLUDE_PATHS:
+    description: "Patterns to exclude from review (comma-separated)"
     required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -32,3 +42,6 @@ runs:
         GITHUB_OWNER: ${{ github.repository_owner }}
         GITHUB_REPO: ${{ github.event.pull_request.head.repo.name }}
         GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+        LANGUAGE: ${{ inputs.LANGUAGE }}
+        MODEL_CODE: ${{ inputs.MODEL_CODE }}
+        EXCLUDE_PATHS: ${{ inputs.EXCLUDE_PATHS }}
