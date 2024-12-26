@@ -23,7 +23,7 @@ runs:
         node-version: 22
 
     - name: Install dependencies
-      run: pnpm install
+      run: npm install
       shell: bash
 
     - name: Run review bot
