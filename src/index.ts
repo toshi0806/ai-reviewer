@@ -59,6 +59,8 @@ async function runReviewBotVercelAI() {
         Diffs:
         ${diffText}
 `;
+        console.log("--- Prompt ---")
+        console.log(userPrompt)
 
         const { text: reviewComment } = await generateText({
             model: google(MODEL_CODE),
@@ -67,7 +69,7 @@ async function runReviewBotVercelAI() {
 
 
 
-        console.log('--- 自動生成されたコードレビュー (vercel/ai) ---');
+        console.log('--- Review ---');
         console.log(reviewComment);
 
         await octokit.pulls.createReview({

@@ -62,11 +62,13 @@ function runReviewBotVercelAI() {
         Diffs:
         ${diffText}
 `;
+            console.log("--- Prompt ---");
+            console.log(userPrompt);
             const { text: reviewComment } = yield (0, ai_1.generateText)({
                 model: (0, google_1.google)(MODEL_CODE),
                 prompt: userPrompt
             });
-            console.log('--- 自動生成されたコードレビュー (vercel/ai) ---');
+            console.log('--- Review ---');
             console.log(reviewComment);
             yield octokit.pulls.createReview({
                 owner: OWNER,
