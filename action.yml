@@ -1,7 +1,6 @@
 # action.yml
 name: "Gemini Review Bot"
 description: "Review Pull Requests using Gemini"
-author: "Your Name or Org"
 
 inputs:
   GEMINI_API_KEY:
@@ -24,7 +23,7 @@ runs:
         node-version: 22
 
     - name: Install dependencies
-      run: npm install
+      run: pnpm install
       shell: bash
 
     - name: Run review bot
