@@ -12,16 +12,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.fetchPullRequest = fetchPullRequest;
 exports.fetchPullRequestFiles = fetchPullRequestFiles;
 exports.filterFiles = filterFiles;
-exports.createDiffText = createDiffText;
+exports.parseFiles = parseFiles;
 exports.createReviewPrompt = createReviewPrompt;
 exports.realPostReviewComment = realPostReviewComment;
 exports.dryRunPostReviewComment = dryRunPostReviewComment;
+exports.createParsedDiffText = createParsedDiffText;
 exports.runReviewBotVercelAI = runReviewBotVercelAI;
-// reviewBot.js
 const ai_1 = require("ai");
 const google_1 = require("@ai-sdk/google");
 const rest_1 = require("@octokit/rest");
 const minimatch_1 = require("minimatch");
+const diff_1 = require("diff");
 /**
  * GitHub の PR 情報を取得
  */
@@ -49,25 +50,22 @@ function fetchPullRequestFiles(octokit, owner, repo, pullNumber) {
     });
 }
 /**
- * 除外パスリスト (EXCLUDE_PATHS) に該当しないファイルだけをフィルタする
+ * 除外パスリスト (excludePaths) に該当しないファイルだけをフィルタする
  */
 function filterFiles(files, excludePaths) {
-    return files.filter(file => {
-        return !excludePaths.some(pattern => (0, minimatch_1.minimatch)(file.filename, pattern, { matchBase: true }));
+    return files.filter((file) => {
+        return !excludePaths.some((pattern) => (0, minimatch_1.minimatch)(file.filename, pattern, { matchBase: true }));
     });
 }
-/**
- * 差分テキスト(diffText) を生成する
- */
-function createDiffText(files) {
-    return files
-        .map(file => `---\nFile: ${file.filename}\nPatch:\n${file.patch}`)
-        .join("\n\n");
+function parseFiles(files) {
+    return files.map((file) => {
+        return Object.assign(Object.assign({}, file), { patch: (0, diff_1.parsePatch)(file.patch) });
+    });
 }
 /**
  * AI に投げるプロンプトを生成する
  */
-function createReviewPrompt({ prTitle, prBody, diffText, language }) {
+function createReviewPrompt({ prTitle, prBody, diffText, language, }) {
     return `
 You're a sophisticated software engineer.
 Please check the code changes in the following Pull Request and point out any potential problems or areas for improvement.
@@ -93,7 +91,7 @@ function realPostReviewComment(params) {
         });
     });
 }
-/** 乾燥実行(dryRun)用の疑似投稿関数 */
+/** dryRun用の疑似投稿関数 */
 function dryRunPostReviewComment(params) {
     return __awaiter(this, void 0, void 0, function* () {
         console.log("--- DryRun Mode ---");
@@ -103,8 +101,78 @@ function dryRunPostReviewComment(params) {
     });
 }
 /**
- * メイン処理
+ * Hunk を行番号付きの文字列にフォーマットする
  */
+function formatHunkWithLineNumbers(hunk) {
+    let oldLine = hunk.oldStart;
+    let newLine = hunk.newStart;
+    // @@ -oldStart,oldLines +newStart,newLines @@ のヘッダー
+    const hunkHeader = `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`;
+    // 各行に対して行番号を付与
+    const formattedLines = hunk.lines.map((line) => {
+        let lineNumbers = "";
+        switch (line[0]) {
+            case "-":
+                // 削除行の場合: oldLine のみインクリメント
+                lineNumbers = `${oldLine.toString().padStart(4, " ")}      `;
+                oldLine++;
+                break;
+            case "+":
+                // 追加行の場合: newLine のみインクリメント
+                lineNumbers = `    ${newLine.toString().padStart(4, " ")}`;
+                newLine++;
+                break;
+            default:
+                // コンテキスト行の場合: oldLine/newLine 両方をインクリメント
+                lineNumbers = `${oldLine.toString().padStart(4, " ")} ${newLine
+                    .toString()
+                    .padStart(4, " ")}`;
+                oldLine++;
+                newLine++;
+                break;
+        }
+        return `${lineNumbers} | ${line}`;
+    });
+    return [hunkHeader, ...formattedLines].join("\n");
+}
+/**
+ * ParsedDiff を使って読みやすい形に差分を整形する
+ */
+function createReadableDiffForFile(file) {
+    const { filename, patch } = file;
+    // "patch" is ParsedDiff[], so we can iterate through each diff
+    const diffTexts = patch.map((diff, diffIndex) => {
+        const headerInfo = [
+            diff.index ? `Index: ${diff.index}` : "",
+            diff.oldFileName ? `Old file: ${diff.oldFileName}` : "",
+            diff.newFileName ? `New file: ${diff.newFileName}` : "",
+        ]
+            .filter(Boolean)
+            .join("\n");
+        // Format each hunk with line numbers
+        const hunksText = diff.hunks
+            .map((hunk) => formatHunkWithLineNumbers(hunk))
+            .join("\n\n");
+        return [
+            `Diff #${diffIndex + 1} for ${filename}`,
+            headerInfo,
+            hunksText,
+        ]
+            .filter(Boolean)
+            .join("\n") + "\n";
+    });
+    return diffTexts.join("\n");
+}
+/**
+ * ParsedPullRequestFile[] をまとめて差分テキスト(diffText)に変換する
+ */
+function createParsedDiffText(parsedFiles) {
+    return parsedFiles
+        .map((file) => {
+        return `---\nFile: ${file.filename}\n${createReadableDiffForFile(file)}`;
+    })
+        .join("\n");
+}
 function runReviewBotVercelAI(_a) {
     return __awaiter(this, arguments, void 0, function* ({ githubToken, owner, repo, pullNumber, excludePaths, language, modelCode, postReviewCommentFn, }) {
         try {
@@ -115,9 +183,11 @@ function runReviewBotVercelAI(_a) {
             const filesData = yield fetchPullRequestFiles(octokit, owner, repo, pullNumber);
             // 3. 除外パスのフィルタリング
             const filteredFiles = filterFiles(filesData, excludePaths);
-            // 4. 差分テキストの生成
-            const diffText = createDiffText(filteredFiles);
-            // 5. プロンプトの生成
+            // 4. ParsedPatch化
+            const parsedFilesData = parseFiles(filteredFiles);
+            // 5. 差分テキストの生成
+            const diffText = createParsedDiffText(parsedFilesData);
+            // 6. プロンプトの生成
             const userPrompt = createReviewPrompt({
                 prTitle: prData.title,
                 prBody: prData.body,
@@ -126,14 +196,14 @@ function runReviewBotVercelAI(_a) {
             });
             console.log("--- Prompt ---");
             console.log(userPrompt);
-            // 6. AI にレビュー文を生成してもらう
+            // 7. AI にレビュー文を生成してもらう
             const { text: reviewComment } = yield (0, ai_1.generateText)({
                 model: (0, google_1.google)(modelCode),
                 prompt: userPrompt,
             });
             console.log("--- Review ---");
             console.log(reviewComment);
-            // 7. GitHub にレビュー文を投稿
+            // 8. GitHub にレビュー文を投稿
             yield postReviewCommentFn({
                 octokit,
                 owner,

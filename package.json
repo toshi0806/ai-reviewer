@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/diff": "^6.0.0",
     "@types/node": "^22.10.2",
     "esbuild-register": "^3.6.0",
     "typescript": "^5.7.2"
@@ -20,6 +21,7 @@
     "@ai-sdk/google": "^1.0.12",
     "@octokit/rest": "^21.0.2",
     "ai": "^4.0.22",
+    "diff": "^7.0.0",
     "dotenv": "^16.4.7",
     "minimatch": "^10.0.1"
   }
