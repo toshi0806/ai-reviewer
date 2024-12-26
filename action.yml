@@ -27,7 +27,7 @@ runs:
       run: cd ${GITHUB_ACTION_PATH} && node dist/index.js
       shell: bash
       env:
-        GEMINI_API_KEY: ${{ inputs.GEMINI_API_KEY }}
+        GOOGLE_GENERATIVE_AI_API_KEY: ${{ inputs.GEMINI_API_KEY }}
         GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
         GITHUB_OWNER: ${{ github.repository_owner }}
         GITHUB_REPO: ${{ github.event.pull_request.head.repo.name }}

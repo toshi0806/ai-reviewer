@@ -3,7 +3,6 @@ import { google } from "@ai-sdk/google"
 import { Octokit } from '@octokit/rest';
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OWNER = process.env.GITHUB_OWNER || 'your-github-owner';
 const REPO = process.env.GITHUB_REPO || 'your-github-repo';
 const PR_NUMBER = Number(process.env.GITHUB_PR_NUMBER) || 1;
