@@ -1,10 +1,7 @@
-import dotenv from 'dotenv';
 import { generateText } from "ai"
 import { google } from "@ai-sdk/google"
 import { Octokit } from '@octokit/rest';
 
-dotenv.config();
-// 1. 環境変数の取得
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OWNER = process.env.GITHUB_OWNER || 'your-github-owner';

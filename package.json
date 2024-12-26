@@ -17,7 +17,6 @@
   "dependencies": {
     "@ai-sdk/google": "^1.0.12",
     "@octokit/rest": "^21.0.2",
-    "ai": "^4.0.22",
-    "dotenv": "^16.4.7"
+    "ai": "^4.0.22"
   }
 }
