@@ -25,5 +25,6 @@ if (!REPO) {
     excludePaths: EXCLUDE_PATHS,
     language: LANGUAGE,
     pullNumber: PR_NUMBER,
-    modelCode: MODEL_CODE
+    modelCode: MODEL_CODE,
+    postReviewCommentFn: utils_1.realPostReviewComment
 });

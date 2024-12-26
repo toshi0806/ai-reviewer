@@ -1,4 +1,7 @@
-import { realPostReviewComment, runReviewBotVercelAI } from "./utils";
+import { dryRunPostReviewComment, runReviewBotVercelAI } from "./utils";
+
+import dotenv from "dotenv"
+dotenv.config()
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const OWNER = process.env.GITHUB_OWNER
@@ -25,5 +28,5 @@ runReviewBotVercelAI({
     language: LANGUAGE,
     pullNumber: PR_NUMBER,
     modelCode: MODEL_CODE,
-    postReviewCommentFn: realPostReviewComment
+    postReviewCommentFn: dryRunPostReviewComment
 })

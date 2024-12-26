@@ -14,7 +14,8 @@ exports.fetchPullRequestFiles = fetchPullRequestFiles;
 exports.filterFiles = filterFiles;
 exports.createDiffText = createDiffText;
 exports.createReviewPrompt = createReviewPrompt;
-exports.postReviewComment = postReviewComment;
+exports.realPostReviewComment = realPostReviewComment;
+exports.dryRunPostReviewComment = dryRunPostReviewComment;
 exports.runReviewBotVercelAI = runReviewBotVercelAI;
 // reviewBot.js
 const ai_1 = require("ai");
@@ -79,11 +80,10 @@ Diffs:
 ${diffText}
 `;
 }
-/**
- * レビューコメントを GitHub に投稿する
- */
-function postReviewComment(octokit_1, _a) {
-    return __awaiter(this, arguments, void 0, function* (octokit, { owner, repo, pullNumber, reviewComment }) {
+/** 実際に GitHub に投稿する関数 */
+function realPostReviewComment(params) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const { octokit, owner, repo, pullNumber, reviewComment } = params;
         yield octokit.pulls.createReview({
             owner,
             repo,
@@ -93,11 +93,20 @@ function postReviewComment(octokit_1, _a) {
         });
     });
 }
+/** 乾燥実行(dryRun)用の疑似投稿関数 */
+function dryRunPostReviewComment(params) {
+    return __awaiter(this, void 0, void 0, function* () {
+        console.log("--- DryRun Mode ---");
+        console.log(`Would post review to ${params.owner}/${params.repo}#${params.pullNumber}`);
+        console.log("Review Comment:");
+        console.log(params.reviewComment);
+    });
+}
 /**
  * メイン処理
  */
 function runReviewBotVercelAI(_a) {
-    return __awaiter(this, arguments, void 0, function* ({ githubToken, owner, repo, pullNumber, excludePaths, language, modelCode, }) {
+    return __awaiter(this, arguments, void 0, function* ({ githubToken, owner, repo, pullNumber, excludePaths, language, modelCode, postReviewCommentFn, }) {
         try {
             const octokit = new rest_1.Octokit({ auth: githubToken });
             // 1. PRデータの取得
@@ -125,7 +134,8 @@ function runReviewBotVercelAI(_a) {
             console.log("--- Review ---");
             console.log(reviewComment);
             // 7. GitHub にレビュー文を投稿
-            yield postReviewComment(octokit, {
+            yield postReviewCommentFn({
+                octokit,
                 owner,
                 repo,
                 pullNumber,

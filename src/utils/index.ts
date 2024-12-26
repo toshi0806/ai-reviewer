@@ -73,7 +73,35 @@ ${diffText}
 /**
  * レビューコメントを GitHub に投稿する
  */
-export async function postReviewComment(octokit: Octokit, { owner, repo, pullNumber, reviewComment }: { owner: string, repo: string, pullNumber: number, reviewComment: string }) {
+
+type PostReviewComment = (params: {
+    octokit: Octokit;
+    owner: string;
+    repo: string;
+    pullNumber: number;
+    reviewComment: string;
+}) => Promise<void>;
+
+interface ReviewBotOptions {
+    githubToken: string;
+    owner: string;
+    repo: string;
+    pullNumber: number;
+    excludePaths: string[];
+    language: string;
+    modelCode: string;
+    postReviewCommentFn: PostReviewComment;
+}
+
+/** 実際に GitHub に投稿する関数 */
+export async function realPostReviewComment(params: {
+    octokit: Octokit;
+    owner: string;
+    repo: string;
+    pullNumber: number;
+    reviewComment: string;
+}) {
+    const { octokit, owner, repo, pullNumber, reviewComment } = params;
     await octokit.pulls.createReview({
         owner,
         repo,
@@ -81,6 +109,20 @@ export async function postReviewComment(octokit: Octokit, { owner, repo, pullNum
         body: reviewComment,
         event: "COMMENT",
     });
+}
+
+/** 乾燥実行(dryRun)用の疑似投稿関数 */
+export async function dryRunPostReviewComment(params: {
+    octokit: Octokit;
+    owner: string;
+    repo: string;
+    pullNumber: number;
+    reviewComment: string;
+}) {
+    console.log("--- DryRun Mode ---");
+    console.log(`Would post review to ${params.owner}/${params.repo}#${params.pullNumber}`);
+    console.log("Review Comment:");
+    console.log(params.reviewComment);
 }
 
 /**
@@ -94,15 +136,8 @@ export async function runReviewBotVercelAI({
     excludePaths,
     language,
     modelCode,
-}: {
-    githubToken: string
-    owner: string
-    repo: string
-    pullNumber: number
-    excludePaths: string[]
-    language: string
-    modelCode: string
-}) {
+    postReviewCommentFn,
+}: ReviewBotOptions) {
     try {
         const octokit = new Octokit({ auth: githubToken });
 
@@ -139,7 +174,8 @@ export async function runReviewBotVercelAI({
         console.log(reviewComment);
 
         // 7. GitHub にレビュー文を投稿
-        await postReviewComment(octokit, {
+        await postReviewCommentFn({
+            octokit,
             owner,
             repo,
             pullNumber,
