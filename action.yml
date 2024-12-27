@@ -1,6 +1,9 @@
 # action.yml
 name: "Gemini Review Bot"
 description: "Review Pull Requests using Gemini"
+branding:
+  icon: "git-pull-request"
+  color: "purple"
 
 inputs:
   GEMINI_API_KEY:
