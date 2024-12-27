@@ -319,7 +319,6 @@ export const generateReviewCommentObject: GenerateReviewCommentFn = async (param
     };
 }
 
-
 export async function runReviewBotVercelAI({
     githubToken,
     owner,

@@ -1,0 +1,14 @@
+name: Update Latest Tag
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  run-review:
+    runs-on: ubuntu-latest
+    steps:
+      # 外部で作ったアクションを呼び出す
+      - name: Latest tag
+        uses: EndBug/latest-tag@v1.6.2
