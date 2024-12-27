@@ -96,12 +96,14 @@ export function filterFiles(
 
 export function parseFiles(files: PullRequestFiles): ParsedPullRequestFile[] {
     return files.map((file) => {
+        if (!file.patch) {
+            return { ...file, patch: [] };
+        }
         return {
             ...file,
-            patch: parsePatch(file.patch!),
+            patch: parsePatch(file.patch),
         };
-    })
-
+    });
 }
 
 /**
