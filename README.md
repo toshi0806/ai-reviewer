@@ -1,11 +1,12 @@
 # ai-reviewer
 
-生成AIによるPRレビューbotです。
+This is a PR review bot powered by generative AI.
 
-## 使い方
+## Usage
 
-`.github/workflows`に`ai-reviewer.yml`など任意の名前で以下のファイルを配置します。
-```
+Place a file (e.g., `ai-reviewer.yml`) in the `.github/workflows` directory with the following content:
+
+```yaml
 name: "Run ai-reviewer"
 
 permissions:
@@ -29,15 +30,14 @@ jobs:
           LANGUAGE: "Japanese"
           EXCLUDE_PATHS: "**/pnpm-lock.yaml"
 ```
-Github Secretsに`GEMINI_API_KEY`としてGoogle AI StudioのGemini API Keyを設定します。
+Then, set your Google AI Studio Gemini API Key as GEMINI_API_KEY in your repository’s GitHub Secrets.
 
-## 設定
+## Configuration
+You can fine-tune how reviews are performed by setting the following environment variables:
 
-以下の環境変数を設定することで、レビューの挙動を細かく制御できます。
-
-| 環境変数名               | Required      | デフォルト値                      | 説明                                                                                                                                                           |
+| Environment Variable               | Required      | Default Value                      | 	Description                                                                                                                                                           |
 |--------------------------|------------|----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **EXCLUDE_PATHS**        | false       | -                                | レビューから除外したいファイルパスやディレクトリをカンマ区切りで指定します。例: `src/vendor,**/dist/*`<br>ここで指定されたパスに該当するファイルはレビューの対象外となります。                                    |
-| **LANGUAGE**             | false       | `English`                        | AIが生成するコメントの言語を指定します。例: `Japanese`, `English`など。                                                                                                          |                                                                                       |
-| **MODEL_CODE**           | false       | `models/gemini-2.0-flash-exp`    | 使用するGeminiモデルの指定です。AI Studioで利用できるモデルコードを設定してください。                                                                                             |
-| **USE_SINGLE_COMMENT_REVIEW** | false | `false`                          | `true`に設定すると、1つのコメントにまとめてレビュー結果を投稿します。<br>`false`の場合は差分にコメントをつける形で複数に分けて投稿します。                                                              |
+| **EXCLUDE_PATHS**        | false       | -                                | 	Specify file paths or directories to exclude from reviews, separated by commas. Example: `src/vendor,**/dist/*`<br>Files matching these paths will not be reviewed.                                    |
+| **LANGUAGE**             | false       | `English`                        | Specifies the language of the AI-generated comments (Example: `Japanese`, `English`).                                                                                                          |                                                                                       |
+| **MODEL_CODE**           | false       | `models/gemini-2.0-flash-exp`    | The Gemini model to use. Please set a valid model code that is available in AI Studio.                                                                                             |
+| **USE_SINGLE_COMMENT_REVIEW** | false | `false`                          | When set to true, posts all review results in a single comment. When set to false, posts multiple comments directly on the relevant parts of the diff.                                                              |
