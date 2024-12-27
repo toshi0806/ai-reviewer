@@ -59,6 +59,9 @@ function filterFiles(files, excludePaths) {
 }
 function parseFiles(files) {
     return files.map((file) => {
+        if (!file.patch) {
+            return Object.assign(Object.assign({}, file), { patch: [] });
+        }
         return Object.assign(Object.assign({}, file), { patch: (0, diff_1.parsePatch)(file.patch) });
     });
 }
