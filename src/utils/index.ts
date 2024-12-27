@@ -122,8 +122,19 @@ export function createReviewPrompt({
 }): string {
     return `
 You're a sophisticated software engineer.
-Please check the code changes in the following Pull Request and point out any potential problems or areas for improvement.
-Your review MUST be written in ${language}.
+Please review the code changes in the following Pull Request and point out potential problems or areas for improvement only if they are significant.
+Important rules about the diff format:
+- Lines that begin with "-" are lines that have been **removed** in this Pull Request.
+- Lines that begin with "+" are lines that have been **added** in this Pull Request.
+- Lines that begin with a space " " are context lines, which have not changed.
+
+Review guidelines:
+- Ignore changes that only involve whitespace, indentation, or formatting that do not affect the code’s behavior.
+- Do not add any review comments for trivial or non-impactful changes (e.g., variable name changes that do not affect logic).
+- For suggestions, assign a priority (e.g., PRIORITY:HIGH, PRIORITY:MEDIUM, PRIORITY:LOW).
+- Use type=POSITIVE only for changes that bring a clear, significant improvement to readability, performance, or maintainability. If a change is merely "not a problem," do not comment on it.
+- Your review must be written in ${language}.
+
 
 Pull Request Title: ${prTitle}
 Pull Request Body: ${prBody}
@@ -273,10 +284,10 @@ export const generateReviewCommentObject: GenerateReviewCommentFn = async (param
                 "The 1-based line number where the comment is placed. " +
                 "This corresponds to the modified (new) line in the diff or the final file."
             ),
-        priority: z
-            .enum(["HIGH", "MEDIUM", "LOW"])
+        type: z
+            .enum(["PRIORITY:HIGH", "PRIORITY:MEDIUM", "PRIORITY:LOW", "POSITIVE"])
             .describe(
-                "The priority of this comment. This can be HIGH, MEDIUM, or LOW."
+                "The type of this comment. For suggestions, set its priority as like 'PRIORITY:HIGH', 'PRIORITY:MEDIUM', or 'PRIORITY:LOW'. For positive comments, it should be 'POSITIVE'."
             ),
     });
 
@@ -296,26 +307,35 @@ export const generateReviewCommentObject: GenerateReviewCommentFn = async (param
     });
 
     const iconMap = {
-        HIGH: ":rotating_light:",
-        MEDIUM: ":warning:",
-        LOW: ":information_source:",
+        "PRIORITY:HIGH": ":rotating_light:",
+        "PRIORITY:MEDIUM": ":warning:",
+        "PRIORITY:LOW": ":information_source:",
+        "POSITIVE": ":sparkles:"
     } as const;
 
     const priorityOrder = {
-        HIGH: 0,
-        MEDIUM: 1,
-        LOW: 2,
+        "PRIORITY:HIGH": 0,
+        "PRIORITY:MEDIUM": 1,
+        "PRIORITY:LOW": 2,
+        "POSITIVE": 999
     } as const;
+
+    const parseCommentType = (type: string) => {
+        if (type.startsWith("PRIORITY:")) {
+            return type.replace("PRIORITY:", "")
+        }
+        return type
+    }
 
     return {
         body: object.body,
         comments: object.comments
-            .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
+            .sort((a, b) => priorityOrder[a.type] - priorityOrder[b.type])
             .map((comment) => {
                 return {
                     ...comment,
-                    body: `${iconMap[comment.priority]} [${comment.priority}] ${comment.body}`,
-                    priority: undefined,
+                    body: `${iconMap[comment.type]} [${parseCommentType(comment.type)}] ${comment.body}`,
+                    type: undefined,
                 };
             }),
     };
