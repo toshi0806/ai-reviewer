@@ -26,5 +26,6 @@ if (!REPO) {
     language: LANGUAGE,
     pullNumber: PR_NUMBER,
     modelCode: MODEL_CODE,
+    generateReviewCommentFn: utils_1.generateReviewCommentObject,
     postReviewCommentFn: utils_1.realPostReviewComment
 });

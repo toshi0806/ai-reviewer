@@ -1,4 +1,4 @@
-import { dryRunPostReviewComment, runReviewBotVercelAI } from "./utils";
+import { dryRunPostReviewComment, generateReviewCommentObject, runReviewBotVercelAI } from "./utils";
 
 import dotenv from "dotenv"
 dotenv.config()
@@ -28,5 +28,6 @@ runReviewBotVercelAI({
     language: LANGUAGE,
     pullNumber: PR_NUMBER,
     modelCode: MODEL_CODE,
+    generateReviewCommentFn: generateReviewCommentObject,
     postReviewCommentFn: dryRunPostReviewComment
 })

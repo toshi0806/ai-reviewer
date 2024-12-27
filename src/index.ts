@@ -1,4 +1,4 @@
-import { realPostReviewComment, runReviewBotVercelAI } from "./utils";
+import { generateReviewCommentObject, realPostReviewComment, runReviewBotVercelAI } from "./utils";
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const OWNER = process.env.GITHUB_OWNER
@@ -25,5 +25,6 @@ runReviewBotVercelAI({
     language: LANGUAGE,
     pullNumber: PR_NUMBER,
     modelCode: MODEL_CODE,
+    generateReviewCommentFn: generateReviewCommentObject,
     postReviewCommentFn: realPostReviewComment
 })

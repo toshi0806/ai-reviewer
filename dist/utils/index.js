@@ -9,13 +9,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.generateReviewCommentObject = exports.generateReviewCommentText = exports.dryRunPostReviewComment = exports.realPostReviewComment = void 0;
 exports.fetchPullRequest = fetchPullRequest;
 exports.fetchPullRequestFiles = fetchPullRequestFiles;
 exports.filterFiles = filterFiles;
 exports.parseFiles = parseFiles;
 exports.createReviewPrompt = createReviewPrompt;
-exports.realPostReviewComment = realPostReviewComment;
-exports.dryRunPostReviewComment = dryRunPostReviewComment;
 exports.createParsedDiffText = createParsedDiffText;
 exports.runReviewBotVercelAI = runReviewBotVercelAI;
 const ai_1 = require("ai");
@@ -23,6 +22,7 @@ const google_1 = require("@ai-sdk/google");
 const rest_1 = require("@octokit/rest");
 const minimatch_1 = require("minimatch");
 const diff_1 = require("diff");
+const zod_1 = require("zod");
 /**
  * GitHub の PR 情報を取得
  */
@@ -79,27 +79,20 @@ ${diffText}
 `;
 }
 /** 実際に GitHub に投稿する関数 */
-function realPostReviewComment(params) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const { octokit, owner, repo, pullNumber, reviewComment } = params;
-        yield octokit.pulls.createReview({
-            owner,
-            repo,
-            pull_number: pullNumber,
-            body: reviewComment,
-            event: "COMMENT",
-        });
-    });
-}
+const realPostReviewComment = (params) => __awaiter(void 0, void 0, void 0, function* () {
+    const { octokit, owner, repo, pullNumber, reviewCommentContent } = params;
+    yield octokit.pulls.createReview(Object.assign({ owner,
+        repo, pull_number: pullNumber, event: "COMMENT" }, reviewCommentContent));
+});
+exports.realPostReviewComment = realPostReviewComment;
 /** dryRun用の疑似投稿関数 */
-function dryRunPostReviewComment(params) {
-    return __awaiter(this, void 0, void 0, function* () {
-        console.log("--- DryRun Mode ---");
-        console.log(`Would post review to ${params.owner}/${params.repo}#${params.pullNumber}`);
-        console.log("Review Comment:");
-        console.log(params.reviewComment);
-    });
-}
+const dryRunPostReviewComment = (params) => __awaiter(void 0, void 0, void 0, function* () {
+    console.log("--- DryRun Mode ---");
+    console.log(`Would post review to ${params.owner}/${params.repo}#${params.pullNumber}`);
+    console.log("Review Comment:");
+    console.log(params.reviewCommentContent);
+});
+exports.dryRunPostReviewComment = dryRunPostReviewComment;
 /**
  * Hunk を行番号付きの文字列にフォーマットする
  */
@@ -119,7 +112,7 @@ function formatHunkWithLineNumbers(hunk) {
                 break;
             case "+":
                 // 追加行の場合: newLine のみインクリメント
-                lineNumbers = `    ${newLine.toString().padStart(4, " ")}`;
+                lineNumbers = `     ${newLine.toString().padStart(4, " ")}`;
                 newLine++;
                 break;
             default:
@@ -173,8 +166,68 @@ function createParsedDiffText(parsedFiles) {
     })
         .join("\n");
 }
+const generateReviewCommentText = (params) => __awaiter(void 0, void 0, void 0, function* () {
+    const { modelCode, userPrompt } = params;
+    const { text } = yield (0, ai_1.generateText)({
+        model: (0, google_1.google)(modelCode),
+        prompt: userPrompt,
+    });
+    return { body: text };
+});
+exports.generateReviewCommentText = generateReviewCommentText;
+const generateReviewCommentObject = (params) => __awaiter(void 0, void 0, void 0, function* () {
+    const { modelCode, userPrompt } = params;
+    const commentSchema = zod_1.z.object({
+        path: zod_1.z
+            .string()
+            .describe("Specifies the relative path to the file where the review comment should be posted. " +
+            "For example, 'src/index.js'. This path must match the file path in the Pull Request."),
+        body: zod_1.z
+            .string()
+            .describe("The content of the comment that will be displayed on the specified line of the Pull Request. " +
+            "This message should clearly explain the suggestion or feedback related to that line."),
+        line: zod_1.z
+            .number()
+            .positive()
+            .describe("The 1-based line number where the comment is placed. " +
+            "This corresponds to the modified (new) line in the diff or the final file."),
+        priority: zod_1.z
+            .enum(["HIGH", "MEDIUM", "LOW"])
+            .describe("The priority of this comment. This can be HIGH, MEDIUM, or LOW."),
+    });
+    const reviewSchema = zod_1.z.object({
+        body: zod_1.z
+            .string()
+            .describe("Represents the overall body text of the review, providing a summary or context for the accompanying line-level comments."),
+        comments: zod_1.z.array(commentSchema),
+    });
+    const { object } = yield (0, ai_1.generateObject)({
+        schema: reviewSchema,
+        model: (0, google_1.google)(modelCode),
+        prompt: userPrompt,
+    });
+    const iconMap = {
+        HIGH: ":rotating_light:",
+        MEDIUM: ":warning:",
+        LOW: ":information_source:",
+    };
+    const priorityOrder = {
+        HIGH: 0,
+        MEDIUM: 1,
+        LOW: 2,
+    };
+    return {
+        body: object.body,
+        comments: object.comments
+            .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
+            .map((comment) => {
+            return Object.assign(Object.assign({}, comment), { body: `${iconMap[comment.priority]} [${comment.priority}] ${comment.body}`, priority: undefined });
+        }),
+    };
+});
+exports.generateReviewCommentObject = generateReviewCommentObject;
 function runReviewBotVercelAI(_a) {
-    return __awaiter(this, arguments, void 0, function* ({ githubToken, owner, repo, pullNumber, excludePaths, language, modelCode, postReviewCommentFn, }) {
+    return __awaiter(this, arguments, void 0, function* ({ githubToken, owner, repo, pullNumber, excludePaths, language, modelCode, generateReviewCommentFn, postReviewCommentFn, }) {
         try {
             const octokit = new rest_1.Octokit({ auth: githubToken });
             // 1. PRデータの取得
@@ -197,19 +250,16 @@ function runReviewBotVercelAI(_a) {
             console.log("--- Prompt ---");
             console.log(userPrompt);
             // 7. AI にレビュー文を生成してもらう
-            const { text: reviewComment } = yield (0, ai_1.generateText)({
-                model: (0, google_1.google)(modelCode),
-                prompt: userPrompt,
-            });
+            const reviewCommentContent = yield generateReviewCommentFn({ modelCode, userPrompt });
             console.log("--- Review ---");
-            console.log(reviewComment);
+            console.log(reviewCommentContent);
             // 8. GitHub にレビュー文を投稿
             yield postReviewCommentFn({
                 octokit,
                 owner,
                 repo,
                 pullNumber,
-                reviewComment,
+                reviewCommentContent,
             });
         }
         catch (error) {
