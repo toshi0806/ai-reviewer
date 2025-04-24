@@ -1,11 +1,54 @@
-
-import { generateText, generateObject } from "ai";
+import { generateText, generateObject, NoObjectGeneratedError } from "ai";
 import { google } from "@ai-sdk/google";
 import { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
 import { minimatch } from "minimatch";
 import { components } from "@octokit/openapi-types";
 import { Hunk, ParsedDiff, parsePatch } from "diff";
 import { z } from "zod"
+
+/**
+ * Generic retry function with exponential backoff
+ */
+async function withRetry<T>(
+    operation: () => Promise<T>,
+    options: {
+        maxAttempts: number;
+        initialDelayMs: number;
+        backoffFactor: number;
+        retryableError: (error: any) => boolean;
+        onRetry?: (attempt: number, error: any) => void;
+    }
+): Promise<T> {
+    const { maxAttempts, initialDelayMs, backoffFactor, retryableError, onRetry } = options;
+
+    let lastError: any;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            return await operation();
+        } catch (error) {
+            lastError = error;
+
+            if (!retryableError(error)) {
+                throw error; // Not retryable, rethrow immediately
+            }
+
+            if (attempt >= maxAttempts) {
+                break; // Will throw the last error after the loop
+            }
+
+            const delayMs = initialDelayMs * Math.pow(backoffFactor, attempt - 1);
+
+            if (onRetry) {
+                onRetry(attempt, error);
+            }
+
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+    }
+
+    throw lastError;
+}
 
 // OpenAPI型定義から直接Pull Requestの型を取得
 type PullRequestData = components["schemas"]["pull-request"];
@@ -129,10 +172,10 @@ Important rules about the diff format:
 - Lines that begin with a space " " are context lines, which have not changed.
 
 Review guidelines:
-- Ignore changes that only involve whitespace, indentation, or formatting that do not affect the code’s behavior.
-- Do not add any review comments for trivial or non-impactful changes (e.g., variable name changes that do not affect logic).
-- For suggestions, assign a priority (e.g., PRIORITY:HIGH, PRIORITY:MEDIUM, PRIORITY:LOW).
-- Use type=POSITIVE only for changes that bring a clear, significant improvement to readability, performance, or maintainability. If a change is merely "not a problem," do not comment on it.
+- Ignore changes that only involve whitespace, indentation, or formatting that do not affect the code's behavior.
+- Do not add any review comments for trivial or non-impactful changes (e.g., variable-name changes that do not affect logic).
+- For suggestions, assign a priority. Only the following labels are allowed: PRIORITY:HIGH, PRIORITY:MEDIUM, PRIORITY:LOW, or POSITIVE.
+- Use type=POSITIVE only for changes that bring a clear, significant improvement to readability, performance, or maintainability. If a change is merely “not a problem,” do not comment on it.
 - Your review must be written in ${language}.
 
 
@@ -300,11 +343,27 @@ export const generateReviewCommentObject: GenerateReviewCommentFn = async (param
         comments: z.array(commentSchema),
     });
 
-    const { object } = await generateObject({
-        schema: reviewSchema,
-        model: google(modelCode),
-        prompt: userPrompt,
-    });
+    // Use the retry mechanism for handling NoObjectGeneratedError
+    const { object } = await withRetry(
+        async () => {
+            return await generateObject({
+                schema: reviewSchema,
+                model: google(modelCode),
+                prompt: userPrompt,
+            });
+        },
+        {
+            maxAttempts: 3,
+            initialDelayMs: 2000,
+            backoffFactor: 1.5,
+            retryableError: (error) => {
+                return error instanceof NoObjectGeneratedError;
+            },
+            onRetry: (attempt, error) => {
+                console.log(`Retry attempt ${attempt} after error: ${error.message}`);
+            }
+        }
+    );
 
     const iconMap = {
         "PRIORITY:HIGH": ":rotating_light:",
@@ -358,7 +417,6 @@ export async function runReviewBotVercelAI({
         // 1. PRデータの取得
         const prData = await fetchPullRequest(octokit, owner, repo, pullNumber);
 
-
         // 2. ファイル一覧の取得
         const filesData = await fetchPullRequestFiles(octokit, owner, repo, pullNumber);
 
@@ -382,8 +440,14 @@ export async function runReviewBotVercelAI({
         console.log("--- Prompt ---");
         console.log(userPrompt);
 
-        // 7. AI にレビュー文を生成してもらう
-        const reviewCommentContent = await generateReviewCommentFn({ modelCode, userPrompt })
+        // 7. AI にレビュー文を生成してもらう (with improved error handling)
+        let reviewCommentContent;
+        try {
+            reviewCommentContent = await generateReviewCommentFn({ modelCode, userPrompt });
+        } catch (error) {
+            console.error("Failed to generate review comment after retries:", error);
+            throw error; // Re-throw to be caught by the outer try-catch
+        }
 
         console.log("--- Review ---");
         console.log(reviewCommentContent);
@@ -399,5 +463,6 @@ export async function runReviewBotVercelAI({
 
     } catch (error) {
         console.error("Error in runReviewBotVercelAI:", error);
+        throw error;
     }
 }
