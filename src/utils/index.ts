@@ -12,7 +12,7 @@ import * as path from 'path';
  * Generic retry function with exponential backoff
  */
 async function withRetry<T>(
-    operation: () => Promise<T>,
+    operation: (attempt?: number) => Promise<T>,
     options: {
         maxAttempts: number;
         initialDelayMs: number;
@@ -27,7 +27,7 @@ async function withRetry<T>(
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-            return await operation();
+            return await operation(attempt);
         } catch (error) {
             lastError = error;
 
@@ -350,54 +350,62 @@ export const generateReviewCommentObject: GenerateReviewCommentFn = async (param
         comments: z.array(commentSchema),
     });
 
-    // Use the retry mechanism for handling NoObjectGeneratedError
-    const { object } = await withRetry(
-        async () => {
-            return await generateObject({
-                schema: reviewSchema,
-                model: google(modelCode),
-                prompt: userPrompt,
-            });
-        },
-        {
-            maxAttempts: 3,
-            initialDelayMs: 2000,
-            backoffFactor: 1.5,
-            retryableError: (error) => {
-                return error instanceof NoObjectGeneratedError;
+    try {
+        // Use the retry mechanism for handling NoObjectGeneratedError
+        const { object } = await withRetry(
+            async (attempt = 1) => {
+                return await generateObject({
+                    schema: reviewSchema,
+                    model: google(modelCode),
+                    prompt: userPrompt,
+                    // Use temperature 0 for first attempt, 0.5 for retries
+                    temperature: attempt === 1 ? 0 : 0.5
+                });
             },
-            onRetry: (attempt, error) => {
-                console.log(`Retry attempt ${attempt} after error: ${error.message}`);
+            {
+                maxAttempts: 3,
+                initialDelayMs: 2000,
+                backoffFactor: 1.5,
+                retryableError: (error) => {
+                    return error instanceof NoObjectGeneratedError;
+                },
+                onRetry: (attempt, error) => {
+                    console.log(`Retry attempt ${attempt} after error: ${error.message}`);
+                }
             }
-        }
-    );
+        );
 
-    const iconMap = {
-        "HIGH": ":rotating_light:",
-        "MEDIUM": ":warning:",
-        "LOW": ":information_source:",
-        "POSITIVE": ":sparkles:"
-    } as const;
+        const iconMap = {
+            "HIGH": ":rotating_light:",
+            "MEDIUM": ":warning:",
+            "LOW": ":information_source:",
+            "POSITIVE": ":sparkles:"
+        } as const;
 
-    const priorityOrder = {
-        "HIGH": 0,
-        "MEDIUM": 1,
-        "LOW": 2,
-        "POSITIVE": 999
-    } as const;
+        const priorityOrder = {
+            "HIGH": 0,
+            "MEDIUM": 1,
+            "LOW": 2,
+            "POSITIVE": 999
+        } as const;
 
-    return {
-        body: object.body,
-        comments: object.comments
-            .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
-            .map((comment) => {
-                return {
-                    ...comment,
-                    body: `${iconMap[comment.priority]} [${comment.priority}] ${comment.body}`,
-                    priority: undefined,
-                };
-            }),
-    };
+        return {
+            body: object.body,
+            comments: object.comments
+                .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
+                .map((comment) => {
+                    return {
+                        ...comment,
+                        body: `${iconMap[comment.priority]} [${comment.priority}] ${comment.body}`,
+                        priority: undefined,
+                    };
+                }),
+        };
+    } catch (error) {
+        // If object generation fails after all retries, fall back to text generation
+        console.log("Failed to generate structured review after all retries. Falling back to text generation.");
+        return await generateReviewCommentText(params);
+    }
 }
 
 export async function runReviewBotVercelAI({
