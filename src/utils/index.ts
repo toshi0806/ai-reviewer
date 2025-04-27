@@ -5,6 +5,8 @@ import { minimatch } from "minimatch";
 import { components } from "@octokit/openapi-types";
 import { Hunk, ParsedDiff, parsePatch } from "diff";
 import { z } from "zod"
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 /**
  * Generic retry function with exponential backoff
@@ -307,6 +309,11 @@ export const generateReviewCommentText: GenerateReviewCommentFn = async (params)
 export const generateReviewCommentObject: GenerateReviewCommentFn = async (params) => {
     const { modelCode, userPrompt } = params;
 
+    // read testPrompt from a file named "testPrompt.txt` in the same directory
+    // this file is comes from: https://github.com/Nasubikun/ai-reviewer/issues/1
+    // const testPromptPath = path.join(process.cwd(), 'src', 'utils', 'testPrompt.txt');
+    // const testPromptText = await fs.readFile(testPromptPath, 'utf-8');
+
     const commentSchema = z.object({
         path: z
             .string()
@@ -327,10 +334,10 @@ export const generateReviewCommentObject: GenerateReviewCommentFn = async (param
                 "The 1-based line number where the comment is placed. " +
                 "This corresponds to the modified (new) line in the diff or the final file."
             ),
-        type: z
-            .enum(["PRIORITY:HIGH", "PRIORITY:MEDIUM", "PRIORITY:LOW", "POSITIVE"])
+        priority: z
+            .enum(["HIGH", "MEDIUM", "LOW", "POSITIVE"])
             .describe(
-                "The type of this comment. For suggestions, set its priority as like 'PRIORITY:HIGH', 'PRIORITY:MEDIUM', or 'PRIORITY:LOW'. For positive comments, it should be 'POSITIVE'."
+                "The priority of this fix. For suggestions, set its priority as like 'HIGH', 'MEDIUM', or 'LOW'. For positive comments, it should be 'POSITIVE'."
             ),
     });
 
@@ -366,35 +373,28 @@ export const generateReviewCommentObject: GenerateReviewCommentFn = async (param
     );
 
     const iconMap = {
-        "PRIORITY:HIGH": ":rotating_light:",
-        "PRIORITY:MEDIUM": ":warning:",
-        "PRIORITY:LOW": ":information_source:",
+        "HIGH": ":rotating_light:",
+        "MEDIUM": ":warning:",
+        "LOW": ":information_source:",
         "POSITIVE": ":sparkles:"
     } as const;
 
     const priorityOrder = {
-        "PRIORITY:HIGH": 0,
-        "PRIORITY:MEDIUM": 1,
-        "PRIORITY:LOW": 2,
+        "HIGH": 0,
+        "MEDIUM": 1,
+        "LOW": 2,
         "POSITIVE": 999
     } as const;
-
-    const parseCommentType = (type: string) => {
-        if (type.startsWith("PRIORITY:")) {
-            return type.replace("PRIORITY:", "")
-        }
-        return type
-    }
 
     return {
         body: object.body,
         comments: object.comments
-            .sort((a, b) => priorityOrder[a.type] - priorityOrder[b.type])
+            .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
             .map((comment) => {
                 return {
                     ...comment,
-                    body: `${iconMap[comment.type]} [${parseCommentType(comment.type)}] ${comment.body}`,
-                    type: undefined,
+                    body: `${iconMap[comment.priority]} [${comment.priority}] ${comment.body}`,
+                    priority: undefined,
                 };
             }),
     };

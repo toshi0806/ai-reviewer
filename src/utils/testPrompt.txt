@@ -1,0 +1,969 @@
+You're a sophisticated software engineer.
+Please review the code changes in the following Pull Request and point out potential problems or areas for improvement only if they are significant.
+Important rules about the diff format:
+- Lines that begin with "-" are lines that have been **removed** in this Pull Request.
+- Lines that begin with "+" are lines that have been **added** in this Pull Request.
+- Lines that begin with a space " " are context lines, which have not changed.
+
+Review guidelines:
+- Ignore changes that only involve whitespace, indentation, or formatting that do not affect the code’s behavior.
+- Do not add any review comments for trivial or non-impactful changes (e.g., variable name changes that do not affect logic).
+- For suggestions, assign a priority (e.g., PRIORITY:HIGH, PRIORITY:MEDIUM, PRIORITY:LOW).
+- Use type=POSITIVE only for changes that bring a clear, significant improvement to readability, performance, or maintainability. If a change is merely "not a problem," do not comment on it.
+- Your review must be written in Japanese.
+
+
+Pull Request Title: feat: initialize Spring Boot project with basic configuration and structure
+Pull Request Body: null
+
+Diffs:
+---
+File: .gitattributes
+Diff #1 for .gitattributes
+@@ -1,0 +1,3 @@
+        1 | +/gradlew text eol=lf
+        2 | +*.bat text eol=crlf
+        3 | +*.jar binary
+
+---
+File: .gitignore
+Diff #1 for .gitignore
+@@ -1,0 +1,37 @@
+        1 | +HELP.md
+        2 | +.gradle
+        3 | +build/
+        4 | +!gradle/wrapper/gradle-wrapper.jar
+        5 | +!**/src/main/**/build/
+        6 | +!**/src/test/**/build/
+        7 | +
+        8 | +### STS ###
+        9 | +.apt_generated
+       10 | +.classpath
+       11 | +.factorypath
+       12 | +.project
+       13 | +.settings
+       14 | +.springBeans
+       15 | +.sts4-cache
+       16 | +bin/
+       17 | +!**/src/main/**/bin/
+       18 | +!**/src/test/**/bin/
+       19 | +
+       20 | +### IntelliJ IDEA ###
+       21 | +.idea
+       22 | +*.iws
+       23 | +*.iml
+       24 | +*.ipr
+       25 | +out/
+       26 | +!**/src/main/**/out/
+       27 | +!**/src/test/**/out/
+       28 | +
+       29 | +### NetBeans ###
+       30 | +/nbproject/private/
+       31 | +/nbbuild/
+       32 | +/dist/
+       33 | +/nbdist/
+       34 | +/.nb-gradle/
+       35 | +
+       36 | +### VS Code ###
+       37 | +.vscode/
+
+---
+File: build.gradle
+Diff #1 for build.gradle
+@@ -1,0 +1,76 @@
+        1 | +buildscript {
+        2 | +  repositories {
+        3 | +    mavenCentral()
+        4 | +  }
+        5 | +  dependencies {
+        6 | +    // specify your JDBC driver
+        7 | +    classpath 'com.mysql:mysql-connector-j:9.1.0'
+        8 | +  }
+        9 | +}
+       10 | +
+       11 | +plugins {
+       12 | +  id 'java'
+       13 | +  id 'org.springframework.boot' version '3.4.5'
+       14 | +  id 'io.spring.dependency-management' version '1.1.7'
+       15 | +  id 'org.domaframework.doma.codegen' version '3.0.0'
+       16 | +  id 'org.domaframework.doma.compile' version '3.0.1'
+       17 | +}
+       18 | +
+       19 | +group = 'com.github.gn5r.boot'
+       20 | +version = '0.0.1-SNAPSHOT'
+       21 | +
+       22 | +java {
+       23 | +  toolchain {
+       24 | +    languageVersion = JavaLanguageVersion.of(21)
+       25 | +  }
+       26 | +}
+       27 | +
+       28 | +configurations {
+       29 | +  compileOnly {
+       30 | +    extendsFrom annotationProcessor
+       31 | +  }
+       32 | +}
+       33 | +
+       34 | +repositories {
+       35 | +  mavenCentral()
+       36 | +}
+       37 | +
+       38 | +dependencies {
+       39 | +  implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+       40 | +  implementation 'org.springframework.boot:spring-boot-starter-web'
+       41 | +  compileOnly 'org.projectlombok:lombok'
+       42 | +  developmentOnly 'org.springframework.boot:spring-boot-devtools'
+       43 | +  runtimeOnly 'com.mysql:mysql-connector-j'
+       44 | +  runtimeOnly 'com.h2database:h2'
+       45 | +  annotationProcessor 'org.projectlombok:lombok'
+       46 | +  testImplementation 'org.springframework.boot:spring-boot-starter-test'
+       47 | +  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+       48 | +  implementation 'org.seasar.doma.boot:doma-spring-boot-starter:2.3.0'
+       49 | +  annotationProcessor 'org.seasar.doma:doma-processor:3.6.0'
+       50 | +}
+       51 | +
+       52 | +tasks.named('test') {
+       53 | +  useJUnitPlatform()
+       54 | +}
+       55 | +
+       56 | +domaCodeGen {
+       57 | +  dev {
+       58 | +    url = 'jdbc:mysql://localhost:3306/sample'
+       59 | +    user = 'sample'
+       60 | +    password = 'sample'
+       61 | +    schemaName = 'sample'
+       62 | +    templateDir = file('src/main/resources/doma')
+       63 | +
+       64 | +    entity {
+       65 | +      packageName = 'com.github.gn5r.boot.sample.external.entity'
+       66 | +      namingType = org.seasar.doma.gradle.codegen.desc.NamingType.SNAKE_LOWER_CASE
+       67 | +      useMappedSuperclass = false
+       68 | +      suffix = 'Entity'
+       69 | +    }
+       70 | +
+       71 | +    dao {
+       72 | +      overwrite = true
+       73 | +      packageName = 'com.github.gn5r.boot.sample.external.dao'
+       74 | +    }
+       75 | +  }
+       76 | +}
+   1   77 | \ No newline at end of file
+
+---
+File: gradle/wrapper/gradle-wrapper.jar
+
+---
+File: gradle/wrapper/gradle-wrapper.properties
+Diff #1 for gradle/wrapper/gradle-wrapper.properties
+@@ -1,0 +1,7 @@
+        1 | +distributionBase=GRADLE_USER_HOME
+        2 | +distributionPath=wrapper/dists
+        3 | +distributionUrl=https\://services.gradle.org/distributions/gradle-8.13-bin.zip
+        4 | +networkTimeout=10000
+        5 | +validateDistributionUrl=true
+        6 | +zipStoreBase=GRADLE_USER_HOME
+        7 | +zipStorePath=wrapper/dists
+
+---
+File: gradlew
+Diff #1 for gradlew
+@@ -1,0 +1,251 @@
+        1 | +#!/bin/sh
+        2 | +
+        3 | +#
+        4 | +# Copyright © 2015-2021 the original authors.
+        5 | +#
+        6 | +# Licensed under the Apache License, Version 2.0 (the "License");
+        7 | +# you may not use this file except in compliance with the License.
+        8 | +# You may obtain a copy of the License at
+        9 | +#
+       10 | +#      https://www.apache.org/licenses/LICENSE-2.0
+       11 | +#
+       12 | +# Unless required by applicable law or agreed to in writing, software
+       13 | +# distributed under the License is distributed on an "AS IS" BASIS,
+       14 | +# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+       15 | +# See the License for the specific language governing permissions and
+       16 | +# limitations under the License.
+       17 | +#
+       18 | +# SPDX-License-Identifier: Apache-2.0
+       19 | +#
+       20 | +
+       21 | +##############################################################################
+       22 | +#
+       23 | +#   Gradle start up script for POSIX generated by Gradle.
+       24 | +#
+       25 | +#   Important for running:
+       26 | +#
+       27 | +#   (1) You need a POSIX-compliant shell to run this script. If your /bin/sh is
+       28 | +#       noncompliant, but you have some other compliant shell such as ksh or
+       29 | +#       bash, then to run this script, type that shell name before the whole
+       30 | +#       command line, like:
+       31 | +#
+       32 | +#           ksh Gradle
+       33 | +#
+       34 | +#       Busybox and similar reduced shells will NOT work, because this script
+       35 | +#       requires all of these POSIX shell features:
+       36 | +#         * functions;
+       37 | +#         * expansions «$var», «${var}», «${var:-default}», «${var+SET}»,
+       38 | +#           «${var#prefix}», «${var%suffix}», and «$( cmd )»;
+       39 | +#         * compound commands having a testable exit status, especially «case»;
+       40 | +#         * various built-in commands including «command», «set», and «ulimit».
+       41 | +#
+       42 | +#   Important for patching:
+       43 | +#
+       44 | +#   (2) This script targets any POSIX shell, so it avoids extensions provided
+       45 | +#       by Bash, Ksh, etc; in particular arrays are avoided.
+       46 | +#
+       47 | +#       The "traditional" practice of packing multiple parameters into a
+       48 | +#       space-separated string is a well documented source of bugs and security
+       49 | +#       problems, so this is (mostly) avoided, by progressively accumulating
+       50 | +#       options in "$@", and eventually passing that to Java.
+       51 | +#
+       52 | +#       Where the inherited environment variables (DEFAULT_JVM_OPTS, JAVA_OPTS,
+       53 | +#       and GRADLE_OPTS) rely on word-splitting, this is performed explicitly;
+       54 | +#       see the in-line comments for details.
+       55 | +#
+       56 | +#       There are tweaks for specific operating systems such as AIX, CygWin,
+       57 | +#       Darwin, MinGW, and NonStop.
+       58 | +#
+       59 | +#   (3) This script is generated from the Groovy template
+       60 | +#       https://github.com/gradle/gradle/blob/HEAD/platforms/jvm/plugins-application/src/main/resources/org/gradle/api/internal/plugins/unixStartScript.txt
+       61 | +#       within the Gradle project.
+       62 | +#
+       63 | +#       You can find Gradle at https://github.com/gradle/gradle/.
+       64 | +#
+       65 | +##############################################################################
+       66 | +
+       67 | +# Attempt to set APP_HOME
+       68 | +
+       69 | +# Resolve links: $0 may be a link
+       70 | +app_path=$0
+       71 | +
+       72 | +# Need this for daisy-chained symlinks.
+       73 | +while
+       74 | +    APP_HOME=${app_path%"${app_path##*/}"}  # leaves a trailing /; empty if no leading path
+       75 | +    [ -h "$app_path" ]
+       76 | +do
+       77 | +    ls=$( ls -ld "$app_path" )
+       78 | +    link=${ls#*' -> '}
+       79 | +    case $link in             #(
+       80 | +      /*)   app_path=$link ;; #(
+       81 | +      *)    app_path=$APP_HOME$link ;;
+       82 | +    esac
+       83 | +done
+       84 | +
+       85 | +# This is normally unused
+       86 | +# shellcheck disable=SC2034
+       87 | +APP_BASE_NAME=${0##*/}
+       88 | +# Discard cd standard output in case $CDPATH is set (https://github.com/gradle/gradle/issues/25036)
+       89 | +APP_HOME=$( cd -P "${APP_HOME:-./}" > /dev/null && printf '%s\n' "$PWD" ) || exit
+       90 | +
+       91 | +# Use the maximum available, or set MAX_FD != -1 to use that value.
+       92 | +MAX_FD=maximum
+       93 | +
+       94 | +warn () {
+       95 | +    echo "$*"
+       96 | +} >&2
+       97 | +
+       98 | +die () {
+       99 | +    echo
+      100 | +    echo "$*"
+      101 | +    echo
+      102 | +    exit 1
+      103 | +} >&2
+      104 | +
+      105 | +# OS specific support (must be 'true' or 'false').
+      106 | +cygwin=false
+      107 | +msys=false
+      108 | +darwin=false
+      109 | +nonstop=false
+      110 | +case "$( uname )" in                #(
+      111 | +  CYGWIN* )         cygwin=true  ;; #(
+      112 | +  Darwin* )         darwin=true  ;; #(
+      113 | +  MSYS* | MINGW* )  msys=true    ;; #(
+      114 | +  NONSTOP* )        nonstop=true ;;
+      115 | +esac
+      116 | +
+      117 | +CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+      118 | +
+      119 | +
+      120 | +# Determine the Java command to use to start the JVM.
+      121 | +if [ -n "$JAVA_HOME" ] ; then
+      122 | +    if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
+      123 | +        # IBM's JDK on AIX uses strange locations for the executables
+      124 | +        JAVACMD=$JAVA_HOME/jre/sh/java
+      125 | +    else
+      126 | +        JAVACMD=$JAVA_HOME/bin/java
+      127 | +    fi
+      128 | +    if [ ! -x "$JAVACMD" ] ; then
+      129 | +        die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME
+      130 | +
+      131 | +Please set the JAVA_HOME variable in your environment to match the
+      132 | +location of your Java installation."
+      133 | +    fi
+      134 | +else
+      135 | +    JAVACMD=java
+      136 | +    if ! command -v java >/dev/null 2>&1
+      137 | +    then
+      138 | +        die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
+      139 | +
+      140 | +Please set the JAVA_HOME variable in your environment to match the
+      141 | +location of your Java installation."
+      142 | +    fi
+      143 | +fi
+      144 | +
+      145 | +# Increase the maximum file descriptors if we can.
+      146 | +if ! "$cygwin" && ! "$darwin" && ! "$nonstop" ; then
+      147 | +    case $MAX_FD in #(
+      148 | +      max*)
+      149 | +        # In POSIX sh, ulimit -H is undefined. That's why the result is checked to see if it worked.
+      150 | +        # shellcheck disable=SC2039,SC3045
+      151 | +        MAX_FD=$( ulimit -H -n ) ||
+      152 | +            warn "Could not query maximum file descriptor limit"
+      153 | +    esac
+      154 | +    case $MAX_FD in  #(
+      155 | +      '' | soft) :;; #(
+      156 | +      *)
+      157 | +        # In POSIX sh, ulimit -n is undefined. That's why the result is checked to see if it worked.
+      158 | +        # shellcheck disable=SC2039,SC3045
+      159 | +        ulimit -n "$MAX_FD" ||
+      160 | +            warn "Could not set maximum file descriptor limit to $MAX_FD"
+      161 | +    esac
+      162 | +fi
+      163 | +
+      164 | +# Collect all arguments for the java command, stacking in reverse order:
+      165 | +#   * args from the command line
+      166 | +#   * the main class name
+      167 | +#   * -classpath
+      168 | +#   * -D...appname settings
+      169 | +#   * --module-path (only if needed)
+      170 | +#   * DEFAULT_JVM_OPTS, JAVA_OPTS, and GRADLE_OPTS environment variables.
+      171 | +
+      172 | +# For Cygwin or MSYS, switch paths to Windows format before running java
+      173 | +if "$cygwin" || "$msys" ; then
+      174 | +    APP_HOME=$( cygpath --path --mixed "$APP_HOME" )
+      175 | +    CLASSPATH=$( cygpath --path --mixed "$CLASSPATH" )
+      176 | +
+      177 | +    JAVACMD=$( cygpath --unix "$JAVACMD" )
+      178 | +
+      179 | +    # Now convert the arguments - kludge to limit ourselves to /bin/sh
+      180 | +    for arg do
+      181 | +        if
+      182 | +            case $arg in                                #(
+      183 | +              -*)   false ;;                            # don't mess with options #(
+      184 | +              /?*)  t=${arg#/} t=/${t%%/*}              # looks like a POSIX filepath
+      185 | +                    [ -e "$t" ] ;;                      #(
+      186 | +              *)    false ;;
+      187 | +            esac
+      188 | +        then
+      189 | +            arg=$( cygpath --path --ignore --mixed "$arg" )
+      190 | +        fi
+      191 | +        # Roll the args list around exactly as many times as the number of
+      192 | +        # args, so each arg winds up back in the position where it started, but
+      193 | +        # possibly modified.
+      194 | +        #
+      195 | +        # NB: a `for` loop captures its iteration list before it begins, so
+      196 | +        # changing the positional parameters here affects neither the number of
+      197 | +        # iterations, nor the values presented in `arg`.
+      198 | +        shift                   # remove old arg
+      199 | +        set -- "$@" "$arg"      # push replacement arg
+      200 | +    done
+      201 | +fi
+      202 | +
+      203 | +
+      204 | +# Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
+      205 | +DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+      206 | +
+      207 | +# Collect all arguments for the java command:
+      208 | +#   * DEFAULT_JVM_OPTS, JAVA_OPTS, and optsEnvironmentVar are not allowed to contain shell fragments,
+      209 | +#     and any embedded shellness will be escaped.
+      210 | +#   * For example: A user cannot expect ${Hostname} to be expanded, as it is an environment variable and will be
+      211 | +#     treated as '${Hostname}' itself on the command line.
+      212 | +
+      213 | +set -- \
+      214 | +        "-Dorg.gradle.appname=$APP_BASE_NAME" \
+      215 | +        -classpath "$CLASSPATH" \
+      216 | +        org.gradle.wrapper.GradleWrapperMain \
+      217 | +        "$@"
+      218 | +
+      219 | +# Stop when "xargs" is not available.
+      220 | +if ! command -v xargs >/dev/null 2>&1
+      221 | +then
+      222 | +    die "xargs is not available"
+      223 | +fi
+      224 | +
+      225 | +# Use "xargs" to parse quoted args.
+      226 | +#
+      227 | +# With -n1 it outputs one arg per line, with the quotes and backslashes removed.
+      228 | +#
+      229 | +# In Bash we could simply go:
+      230 | +#
+      231 | +#   readarray ARGS < <( xargs -n1 <<<"$var" ) &&
+      232 | +#   set -- "${ARGS[@]}" "$@"
+      233 | +#
+      234 | +# but POSIX shell has neither arrays nor command substitution, so instead we
+      235 | +# post-process each arg (as a line of input to sed) to backslash-escape any
+      236 | +# character that might be a shell metacharacter, then use eval to reverse
+      237 | +# that process (while maintaining the separation between arguments), and wrap
+      238 | +# the whole thing up as a single "set" statement.
+      239 | +#
+      240 | +# This will of course break if any of these variables contains a newline or
+      241 | +# an unmatched quote.
+      242 | +#
+      243 | +
+      244 | +eval "set -- $(
+      245 | +        printf '%s\n' "$DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS" |
+      246 | +        xargs -n1 |
+      247 | +        sed ' s~[^-[:alnum:]+,./:=@_]~\\&~g; ' |
+      248 | +        tr '\n' ' '
+      249 | +    )" '"$@"'
+      250 | +
+      251 | +exec "$JAVACMD" "$@"
+
+---
+File: gradlew.bat
+Diff #1 for gradlew.bat
+@@ -1,0 +1,94 @@
+        1 | +@rem
+        2 | +@rem Copyright 2015 the original author or authors.
+        3 | +@rem
+        4 | +@rem Licensed under the Apache License, Version 2.0 (the "License");
+        5 | +@rem you may not use this file except in compliance with the License.
+        6 | +@rem You may obtain a copy of the License at
+        7 | +@rem
+        8 | +@rem      https://www.apache.org/licenses/LICENSE-2.0
+        9 | +@rem
+       10 | +@rem Unless required by applicable law or agreed to in writing, software
+       11 | +@rem distributed under the License is distributed on an "AS IS" BASIS,
+       12 | +@rem WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+       13 | +@rem See the License for the specific language governing permissions and
+       14 | +@rem limitations under the License.
+       15 | +@rem
+       16 | +@rem SPDX-License-Identifier: Apache-2.0
+       17 | +@rem
+       18 | +
+       19 | +@if "%DEBUG%"=="" @echo off
+       20 | +@rem ##########################################################################
+       21 | +@rem
+       22 | +@rem  Gradle startup script for Windows
+       23 | +@rem
+       24 | +@rem ##########################################################################
+       25 | +
+       26 | +@rem Set local scope for the variables with windows NT shell
+       27 | +if "%OS%"=="Windows_NT" setlocal
+       28 | +
+       29 | +set DIRNAME=%~dp0
+       30 | +if "%DIRNAME%"=="" set DIRNAME=.
+       31 | +@rem This is normally unused
+       32 | +set APP_BASE_NAME=%~n0
+       33 | +set APP_HOME=%DIRNAME%
+       34 | +
+       35 | +@rem Resolve any "." and ".." in APP_HOME to make it shorter.
+       36 | +for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
+       37 | +
+       38 | +@rem Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
+       39 | +set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
+       40 | +
+       41 | +@rem Find java.exe
+       42 | +if defined JAVA_HOME goto findJavaFromJavaHome
+       43 | +
+       44 | +set JAVA_EXE=java.exe
+       45 | +%JAVA_EXE% -version >NUL 2>&1
+       46 | +if %ERRORLEVEL% equ 0 goto execute
+       47 | +
+       48 | +echo. 1>&2
+       49 | +echo ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH. 1>&2
+       50 | +echo. 1>&2
+       51 | +echo Please set the JAVA_HOME variable in your environment to match the 1>&2
+       52 | +echo location of your Java installation. 1>&2
+       53 | +
+       54 | +goto fail
+       55 | +
+       56 | +:findJavaFromJavaHome
+       57 | +set JAVA_HOME=%JAVA_HOME:"=%
+       58 | +set JAVA_EXE=%JAVA_HOME%/bin/java.exe
+       59 | +
+       60 | +if exist "%JAVA_EXE%" goto execute
+       61 | +
+       62 | +echo. 1>&2
+       63 | +echo ERROR: JAVA_HOME is set to an invalid directory: %JAVA_HOME% 1>&2
+       64 | +echo. 1>&2
+       65 | +echo Please set the JAVA_HOME variable in your environment to match the 1>&2
+       66 | +echo location of your Java installation. 1>&2
+       67 | +
+       68 | +goto fail
+       69 | +
+       70 | +:execute
+       71 | +@rem Setup the command line
+       72 | +
+       73 | +set CLASSPATH=%APP_HOME%\gradle\wrapper\gradle-wrapper.jar
+       74 | +
+       75 | +
+       76 | +@rem Execute Gradle
+       77 | +"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" org.gradle.wrapper.GradleWrapperMain %*
+       78 | +
+       79 | +:end
+       80 | +@rem End local scope for the variables with windows NT shell
+       81 | +if %ERRORLEVEL% equ 0 goto mainEnd
+       82 | +
+       83 | +:fail
+       84 | +rem Set variable GRADLE_EXIT_CONSOLE if you need the _script_ return code instead of
+       85 | +rem the _cmd.exe /c_ return code!
+       86 | +set EXIT_CODE=%ERRORLEVEL%
+       87 | +if %EXIT_CODE% equ 0 set EXIT_CODE=1
+       88 | +if not ""=="%GRADLE_EXIT_CONSOLE%" exit %EXIT_CODE%
+       89 | +exit /b %EXIT_CODE%
+       90 | +
+       91 | +:mainEnd
+       92 | +if "%OS%"=="Windows_NT" endlocal
+       93 | +
+       94 | +:omega
+
+---
+File: settings.gradle
+Diff #1 for settings.gradle
+@@ -1,0 +1,1 @@
+        1 | +rootProject.name = 'spring-boot-sample'
+
+---
+File: src/main/java/com/github/gn5r/boot/sample/SampleApplication.java
+Diff #1 for src/main/java/com/github/gn5r/boot/sample/SampleApplication.java
+@@ -1,0 +1,13 @@
+        1 | +package com.github.gn5r.boot.sample;
+        2 | +
+        3 | +import org.springframework.boot.SpringApplication;
+        4 | +import org.springframework.boot.autoconfigure.SpringBootApplication;
+        5 | +
+        6 | +@SpringBootApplication
+        7 | +public class SampleApplication {
+        8 | +
+        9 | +  public static void main(String[] args) {
+       10 | +    SpringApplication.run(SampleApplication.class, args);
+       11 | +  }
+       12 | +
+       13 | +}
+
+---
+File: src/main/resources/application.yml
+Diff #1 for src/main/resources/application.yml
+@@ -1,0 +1,14 @@
+        1 | +spring:
+        2 | +  application:
+        3 | +    name: spring-boot-sample
+        4 | +  datasource:
+        5 | +    driver-class-name: org.h2.Driver
+        6 | +    url: jdbc:h2:mem:sample;
+        7 | +    username: sa
+        8 | +    password: sa
+        9 | +  h2:
+       10 | +    console:
+       11 | +      enabled: true
+       12 | +
+       13 | +doma:
+       14 | +  dialect: h2
+   1   15 | \ No newline at end of file
+
+---
+File: src/main/resources/doma/dao.ftl
+Diff #1 for src/main/resources/doma/dao.ftl
+@@ -1,0 +1,67 @@
+        1 | +<#-- See also org.seasar.doma.gradle.codegen.desc.DaoDesc -->
+        2 | +<#import "/lib.ftl" as lib>
+        3 | +<#if lib.copyright??>
+        4 | +${lib.copyright}
+        5 | +</#if>
+        6 | +<#if packageName??>
+        7 | +package ${packageName};
+        8 | +</#if>
+        9 | +
+       10 | +<#list importNames as importName>
+       11 | +import ${importName};
+       12 | +</#list>
+       13 | +import org.seasar.doma.boot.ConfigAutowireable;
+       14 | +
+       15 | +/**
+       16 | +<#if lib.author??>
+       17 | + * @author ${lib.author}
+       18 | +</#if>
+       19 | + */
+       20 | +@ConfigAutowireable
+       21 | +@Dao<#if configClassSimpleName??>(config = ${configClassSimpleName}.class)</#if>
+       22 | +public interface ${simpleName} {
+       23 | +
+       24 | +<#if entityDesc.idEntityPropertyDescs?size gt 0>
+       25 | +    /**
+       26 | +<#list entityDesc.idEntityPropertyDescs as property>
+       27 | +     * @param ${property.name}
+       28 | +</#list>
+       29 | +     * @return the <#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityDesc.simpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if> entity
+       30 | +     */
+       31 | +    @Select
+       32 | +    <#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityDesc.simpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if> selectById(<#list entityDesc.idEntityPropertyDescs as property>${property.propertyClassSimpleName} ${property.name}<#if property_has_next>, </#if></#list>);
+       33 | +
+       34 | +</#if>
+       35 | +<#if entityDesc.idEntityPropertyDescs?size gt 0 && entityDesc.versionEntityPropertyDesc??>
+       36 | +    /**
+       37 | +<#list entityDesc.idEntityPropertyDescs as property>
+       38 | +     * @param ${property.name}
+       39 | +</#list>
+       40 | +     * @param ${entityDesc.versionEntityPropertyDesc.name}
+       41 | +     * @return the <#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityDesc.simpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if> entity
+       42 | +     */
+       43 | +    @Select(ensureResult = true)
+       44 | +    <#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityDesc.simpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if> selectByIdAndVersion(<#list entityDesc.idEntityPropertyDescs as property>${property.propertyClassSimpleName} ${property.name}, </#list>${entityDesc.versionEntityPropertyDesc.propertyClassSimpleName} ${entityDesc.versionEntityPropertyDesc.name});
+       45 | +
+       46 | +</#if>
+       47 | +    /**
+       48 | +     * @param entity
+       49 | +     * @return affected rows
+       50 | +     */
+       51 | +    @Insert
+       52 | +    int insert(<#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityDesc.simpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if> entity);
+       53 | +
+       54 | +    /**
+       55 | +     * @param entity
+       56 | +     * @return affected rows
+       57 | +     */
+       58 | +    @Update
+       59 | +    int update(<#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityDesc.simpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if> entity);
+       60 | +
+       61 | +    /**
+       62 | +     * @param entity
+       63 | +     * @return affected rows
+       64 | +     */
+       65 | +    @Delete
+       66 | +    int delete(<#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityDesc.simpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if> entity);
+       67 | +}
+   1   68 | \ No newline at end of file
+
+---
+File: src/main/resources/doma/entity.ftl
+Diff #1 for src/main/resources/doma/entity.ftl
+@@ -1,0 +1,81 @@
+        1 | +<#-- See also org.seasar.doma.gradle.codegen.desc.EntityDesc -->
+        2 | +<#import "/lib.ftl" as lib>
+        3 | +<#if lib.copyright??>
+        4 | +${lib.copyright}
+        5 | +</#if>
+        6 | +<#if packageName??>
+        7 | +package ${packageName};
+        8 | +</#if>
+        9 | +
+       10 | +<#list importNames as importName>
+       11 | +import ${importName};
+       12 | +</#list>
+       13 | +
+       14 | +/**
+       15 | +<#if showDbComment && comment??>
+       16 | + * ${comment}
+       17 | +</#if>
+       18 | +<#if lib.author??>
+       19 | + * @author ${lib.author}
+       20 | +</#if>
+       21 | + */
+       22 | +@Entity<#if useListener || namingType != "NONE" || useMetamodel>(</#if><#if useListener>listener = ${listenerClassSimpleName}.class</#if><#if namingType != "NONE"><#if useListener>, </#if>naming = ${namingType.referenceName}</#if><#if useMetamodel><#if useListener || namingType != "NONE">, </#if>metamodel = @Metamodel</#if><#if useListener || namingType != "NONE" || useMetamodel>)</#if>
+       23 | +<#if showCatalogName && catalogName?? || showSchemaName && schemaName?? || showTableName && tableName??>
+       24 | +@Table(<#if showCatalogName && catalogName??>catalog = "${catalogName}"</#if><#if showSchemaName && schemaName??><#if showCatalogName && catalogName??>, </#if>schema = "${schemaName}"</#if><#if showTableName><#if showCatalogName && catalogName?? || showSchemaName && schemaName??>, </#if>name = "${tableName}"</#if>)
+       25 | +</#if>
+       26 | +public class <#if entityPrefix??>${entityPrefix}</#if>${simpleName}<#if entitySuffix??>${entitySuffix}</#if><#if superclassSimpleName??> extends ${superclassSimpleName}</#if> {
+       27 | +<#list ownEntityPropertyDescs as property>
+       28 | +
+       29 | +  <#if showDbComment && property.comment??>
+       30 | +    /** ${property.comment} */
+       31 | +  <#else>
+       32 | +    /** */
+       33 | +  </#if>
+       34 | +  <#if property.id>
+       35 | +    @Id
+       36 | +    <#if property.generationType??>
+       37 | +    @GeneratedValue(strategy = ${property.generationType.referenceName})
+       38 | +      <#if property.generationType == "SEQUENCE">
+       39 | +    @SequenceGenerator(sequence = "${tableName}_${property.columnName}"<#if property.initialValue??>, initialValue = ${property.initialValue}</#if><#if property.allocationSize??>, allocationSize = ${property.allocationSize}</#if>)
+       40 | +      <#elseif property.generationType == "TABLE">
+       41 | +    @TableGenerator(pkColumnValue = "${tableName}_${property.columnName}"<#if property.initialValue??>, initialValue = ${property.initialValue}</#if><#if property.allocationSize??>, allocationSize = ${property.allocationSize}</#if>)
+       42 | +      </#if>
+       43 | +    </#if>
+       44 | +  </#if>
+       45 | +  <#if property.version>
+       46 | +    @Version
+       47 | +  </#if>
+       48 | +  <#if property.showColumnName && property.columnName??>
+       49 | +    @Column(name = "${property.columnName}")
+       50 | +  </#if>
+       51 | +    <#if !useAccessor>public </#if>${property.propertyClassSimpleName} ${property.name};
+       52 | +</#list>
+       53 | +<#if originalStatesPropertyName??>
+       54 | +
+       55 | +    /** */
+       56 | +    @OriginalStates
+       57 | +    <#if entityPrefix??>${entityPrefix}</#if>${simpleName}<#if entitySuffix??>${entitySuffix}</#if> ${originalStatesPropertyName};
+       58 | +</#if>
+       59 | +<#if useAccessor>
+       60 | +  <#list ownEntityPropertyDescs as property>
+       61 | +
+       62 | +    /** 
+       63 | +     * Returns the ${property.name}.
+       64 | +     * 
+       65 | +     * @return the ${property.name}
+       66 | +     */
+       67 | +    public ${property.propertyClassSimpleName} get${property.name?cap_first}() {
+       68 | +        return ${property.name};
+       69 | +    }
+       70 | +
+       71 | +    /** 
+       72 | +     * Sets the ${property.name}.
+       73 | +     * 
+       74 | +     * @param ${property.name} the ${property.name}
+       75 | +     */
+       76 | +    public void set${property.name?cap_first}(${property.propertyClassSimpleName} ${property.name}) {
+       77 | +        this.${property.name} = ${property.name};
+       78 | +    }
+       79 | +  </#list>
+       80 | +</#if>
+       81 | +}
+   1   82 | \ No newline at end of file
+
+---
+File: src/main/resources/doma/entityListener.ftl
+Diff #1 for src/main/resources/doma/entityListener.ftl
+@@ -1,0 +1,47 @@
+        1 | +<#-- See also org.seasar.doma.gradle.codegen.desc.EntityListenerDesc -->
+        2 | +<#import "/lib.ftl" as lib>
+        3 | +<#if lib.copyright??>
+        4 | +${lib.copyright}
+        5 | +</#if>
+        6 | +<#if packageName??>
+        7 | +package ${packageName};
+        8 | +</#if>
+        9 | +
+       10 | +<#list importNames as importName>
+       11 | +import ${importName};
+       12 | +</#list>
+       13 | +
+       14 | +/**
+       15 | + * 
+       16 | +<#if lib.author??>
+       17 | + * @author ${lib.author}
+       18 | +</#if>
+       19 | + */
+       20 | +public class ${simpleName}<#if superclassSimpleName??> extends ${superclassSimpleName}<<#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityClassSimpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if>><#else> implements EntityListener<<#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityClassSimpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if>></#if> {
+       21 | +<#if !superclassSimpleName??>
+       22 | +
+       23 | +    @Override
+       24 | +    public void preInsert(<#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityClassSimpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if> entity, PreInsertContext<<#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityClassSimpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if>> context) {
+       25 | +    }
+       26 | +
+       27 | +    @Override
+       28 | +    public void preUpdate(<#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityClassSimpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if> entity, PreUpdateContext<<#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityClassSimpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if>> context) {
+       29 | +    }
+       30 | +
+       31 | +    @Override
+       32 | +    public void preDelete(<#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityClassSimpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if> entity, PreDeleteContext<<#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityClassSimpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if>> context) {
+       33 | +    }
+       34 | +
+       35 | +    @Override
+       36 | +    public void postInsert(<#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityClassSimpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if> entity, PostInsertContext<<#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityClassSimpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if>> context) {
+       37 | +    }
+       38 | +
+       39 | +    @Override
+       40 | +    public void postUpdate(<#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityClassSimpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if> entity, PostUpdateContext<<#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityClassSimpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if>> context) {
+       41 | +    }
+       42 | +
+       43 | +    @Override
+       44 | +    public void postDelete(<#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityClassSimpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if> entity, PostDeleteContext<<#if entityDesc.entityPrefix??>${entityDesc.entityPrefix}</#if>${entityClassSimpleName}<#if entityDesc.entitySuffix??>${entityDesc.entitySuffix}</#if>> context) {
+       45 | +    }
+       46 | +</#if>
+       47 | +}
+   1   48 | \ No newline at end of file
+
+---
+File: src/main/resources/doma/lib.ftl
+
+---
+File: src/main/resources/doma/mappedSuperclass.ftl
+Diff #1 for src/main/resources/doma/mappedSuperclass.ftl
+@@ -1,0 +1,20 @@
+        1 | +<#-- See also org.seasar.doma.gradle.codegen.desc.EntityListenerDesc -->
+        2 | +<#import "/lib.ftl" as lib>
+        3 | +<#if lib.copyright??>
+        4 | +${lib.copyright}
+        5 | +</#if>
+        6 | +<#if packageName??>
+        7 | +package ${packageName};
+        8 | +</#if>
+        9 | +
+       10 | +<#list importNames as importName>
+       11 | +import ${importName};
+       12 | +</#list>
+       13 | +
+       14 | +/**
+       15 | +<#if lib.author??>
+       16 | + * @author ${lib.author}
+       17 | +</#if>
+       18 | + */
+       19 | +public abstract class ${simpleName}<#if superclassSimpleName??> extends ${superclassSimpleName}</#if> {
+       20 | +}
+   1   21 | \ No newline at end of file
+
+---
+File: src/main/resources/doma/selectById.sql.ftl
+Diff #1 for src/main/resources/doma/selectById.sql.ftl
+@@ -1,0 +1,10 @@
+        1 | +<#-- See also org.seasar.doma.gradle.codegen.desc.SqlDesc -->
+        2 | +select
+        3 | +  /*%expand*/*
+        4 | +from
+        5 | +  ${entityDesc.tableName}
+        6 | +where
+        7 | +<#list entityDesc.idEntityPropertyDescs as property>
+        8 | +  ${property.columnName} = /* ${property.name} */<#if property.number>1<#elseif property.time>${toTime("12:34:56")}<#elseif property.date>${toDate("2010-01-23")}<#elseif property.timestamp>${toTimestamp("2010-01-23 12:34:56")}<#else>'a'</#if><#if property_has_next>
+        9 | +  and</#if>
+       10 | +</#list>
+   1   11 | \ No newline at end of file
+
+---
+File: src/main/resources/doma/selectByIdAndVersion.sql.ftl
+Diff #1 for src/main/resources/doma/selectByIdAndVersion.sql.ftl
+@@ -1,0 +1,13 @@
+        1 | +<#-- See also org.seasar.doma.gradle.codegen.desc.SqlDesc -->
+        2 | +select
+        3 | +  /*%expand*/*
+        4 | +from
+        5 | +  ${entityDesc.tableName}
+        6 | +where
+        7 | +<#list entityDesc.idEntityPropertyDescs as property>
+        8 | +  ${property.columnName} = /* ${property.name} */<#if property.number>1<#elseif property.time>${toTime("12:34:56")}<#elseif property.date>${toDate("2010-01-23")}<#elseif property.timestamp>${toTimestamp("2010-01-23 12:34:56")}<#else>'a'</#if>
+        9 | +  and
+       10 | +</#list>
+       11 | +<#if entityDesc.idEntityPropertyDescs?size gt 0 && entityDesc.versionEntityPropertyDesc??>
+       12 | +  ${entityDesc.versionEntityPropertyDesc.columnName} = /* ${entityDesc.versionEntityPropertyDesc.name} */1
+       13 | +</#if>
+   1   14 | \ No newline at end of file
+
+---
+File: src/main/resources/doma/sqlTest.ftl
+Diff #1 for src/main/resources/doma/sqlTest.ftl
+@@ -1,0 +1,104 @@
+        1 | +<#-- See also org.seasar.doma.gradle.codegen.desc.SqlTestDesc -->
+        2 | +<#import "/lib.ftl" as lib>
+        3 | +<#if lib.copyright??>
+        4 | +${lib.copyright}
+        5 | +</#if>
+        6 | +<#if packageName??>
+        7 | +package ${packageName};
+        8 | +</#if>
+        9 | +
+       10 | +import java.sql.Connection;
+       11 | +import java.sql.Driver;
+       12 | +import java.sql.DriverManager;
+       13 | +import java.sql.Statement;
+       14 | +
+       15 | +import org.junit.jupiter.api.BeforeEach;
+       16 | +import org.junit.jupiter.api.Test;
+       17 | +import org.junit.jupiter.api.TestInfo;
+       18 | +
+       19 | +import org.seasar.doma.jdbc.NoCacheSqlFileRepository;
+       20 | +import org.seasar.doma.jdbc.SqlFile;
+       21 | +import org.seasar.doma.jdbc.SqlFileRepository;
+       22 | +import org.seasar.doma.jdbc.dialect.Dialect;
+       23 | +
+       24 | +/**
+       25 | + * 
+       26 | +<#if lib.author??>
+       27 | + * @author ${lib.author}
+       28 | +</#if>
+       29 | + */
+       30 | +public class <#if entityPrefix??>${entityPrefix}</#if>${simpleName}<#if entitySuffix??>${entitySuffix}</#if> {
+       31 | +
+       32 | +    /** */
+       33 | +    protected SqlFileRepository repository;
+       34 | +
+       35 | +    /** */
+       36 | +    protected Dialect dialect;
+       37 | +
+       38 | +    /** */
+       39 | +    protected Driver driver;
+       40 | +
+       41 | +    /** */
+       42 | +    protected String url;
+       43 | +
+       44 | +    /** */
+       45 | +    protected String user;
+       46 | +
+       47 | +    /** */
+       48 | +    protected String password;
+       49 | +
+       50 | +    @BeforeEach
+       51 | +    protected void setUp() throws Exception {
+       52 | +        repository = new NoCacheSqlFileRepository();
+       53 | +        dialect = new ${dialectClassName}();
+       54 | +        url = "${url}";
+       55 | +        user = "${user}";
+       56 | +        password = "${password}";
+       57 | +    }
+       58 | +
+       59 | +    /**
+       60 | +     * 
+       61 | +     * @param sqlFile
+       62 | +     * @throws Exception
+       63 | +     */
+       64 | +    protected void execute(SqlFile sqlFile) throws Exception {
+       65 | +        Connection connection = getConnection();
+       66 | +        try {
+       67 | +            connection.setAutoCommit(false);
+       68 | +            Statement statement = connection.createStatement();
+       69 | +            try {
+       70 | +                statement.execute(sqlFile.getSql());
+       71 | +            } finally {
+       72 | +                statement.close();
+       73 | +            }
+       74 | +        } finally {
+       75 | +            try {
+       76 | +                connection.rollback();
+       77 | +            } finally {
+       78 | +                connection.close();
+       79 | +            }
+       80 | +        }
+       81 | +    }
+       82 | +
+       83 | +    /**
+       84 | +     * 
+       85 | +     * @return
+       86 | +     * @throws Exception
+       87 | +     */
+       88 | +    protected Connection getConnection() throws Exception {
+       89 | +        return DriverManager.getConnection(url, user, password);
+       90 | +    }
+       91 | +<#list methodDescs as methodDesc>
+       92 | +
+       93 | +    /**
+       94 | +     * 
+       95 | +     * @throws Exception
+       96 | +     */
+       97 | +    @Test
+       98 | +    public void ${methodDesc.methodName}(TestInfo testInfo) throws Exception {
+       99 | +        SqlFile sqlFile = repository.getSqlFile(testInfo.getTestMethod().get(), "${methodDesc.path}", dialect);
+      100 | +        execute(sqlFile);
+      101 | +    }
+      102 | +</#list>
+      103 | +
+      104 | +}
+   1  105 | \ No newline at end of file
+
+---
+File: src/test/java/com/github/gn5r/boot/sample/SampleApplicationTests.java
+Diff #1 for src/test/java/com/github/gn5r/boot/sample/SampleApplicationTests.java
+@@ -1,0 +1,13 @@
+        1 | +package com.github.gn5r.boot.sample;
+        2 | +
+        3 | +import org.junit.jupiter.api.Test;
+        4 | +import org.springframework.boot.test.context.SpringBootTest;
+        5 | +
+        6 | +@SpringBootTest
+        7 | +class SampleApplicationTests {
+        8 | +
+        9 | +  @Test
+       10 | +  void contextLoads() {
+       11 | +  }
+       12 | +
+       13 | +}
