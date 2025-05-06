@@ -1,3 +1,4 @@
+[ENGLISH](./README.md) | [日本語](./README.ja.md)
 # ai-reviewer
 
 This is a PR review bot powered by generative AI.
@@ -29,6 +30,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           LANGUAGE: "Japanese"
           EXCLUDE_PATHS: "**/pnpm-lock.yaml"
+          MODEL_CODE: "models/gemini-2.5-flash-preview-04-17"
 ```
 Then, set your Google AI Studio Gemini API Key as GEMINI_API_KEY in your repository’s GitHub Secrets.
 
@@ -39,5 +41,5 @@ You can fine-tune how reviews are performed by setting the following environment
 |--------------------------|------------|----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **EXCLUDE_PATHS**        | false       | -                                | 	Specify file paths or directories to exclude from reviews, separated by commas. Example: `src/vendor,**/dist/*`<br>Files matching these paths will not be reviewed.                                    |
 | **LANGUAGE**             | false       | `English`                        | Specifies the language of the AI-generated comments (Example: `Japanese`, `English`).                                                                                                          |                                                                                       |
-| **MODEL_CODE**           | false       | `models/gemini-2.0-flash-exp`    | The Gemini model to use. Please set a valid model code that is available in AI Studio.                                                                                             |
+| **MODEL_CODE**           | false       | `models/gemini-2.5-flash-preview-04-17`    | The Gemini model to use. Please set a valid model code that is available in AI Studio.                                                                                             |
 | **USE_SINGLE_COMMENT_REVIEW** | false | `false`                          | When set to true, posts all review results in a single comment. When set to false, posts multiple comments directly on the relevant parts of the diff.                                                              |
