@@ -1,8 +1,8 @@
 # action.yml
-name: "Gemini Review Bot"
-description: "Review Pull Requests using Gemini"
+name: "AI Academic Paper Reviewer"
+description: "AI-powered academic paper review bot that provides educational feedback using Gemini AI"
 branding:
-  icon: "git-pull-request"
+  icon: "book-open"
   color: "purple"
 
 inputs:
@@ -20,9 +20,13 @@ inputs:
     description: "Preferred language for review comments"
     default: "English"
   EXCLUDE_PATHS:
-    description: "Patterns to exclude from review (comma-separated)"
+    description: "Patterns to exclude from review (comma-separated). Example: *.bib,*.sty,*.cls"
     required: false
     default: ""
+  REVIEW_MODE:
+    description: "Review mode: ACADEMIC for academic papers, CODE for code reviews"
+    required: false
+    default: "CODE"
 
 runs:
   using: "composite"
@@ -48,3 +52,4 @@ runs:
         LANGUAGE: ${{ inputs.LANGUAGE }}
         MODEL_CODE: ${{ inputs.MODEL_CODE }}
         EXCLUDE_PATHS: ${{ inputs.EXCLUDE_PATHS }}
+        REVIEW_MODE: ${{ inputs.REVIEW_MODE }}

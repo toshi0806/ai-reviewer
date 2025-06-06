@@ -1,7 +1,7 @@
 {
-  "name": "ai-reviewer",
+  "name": "ai-academic-paper-reviewer",
   "version": "1.0.0",
-  "description": "",
+  "description": "AI-powered academic paper review bot that provides educational feedback using Gemini AI",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

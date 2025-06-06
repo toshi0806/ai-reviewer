@@ -8,6 +8,10 @@ import { z } from "zod"
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
+// 学術論文レビュー用の関数をインポート
+export { createAcademicReviewPrompt } from './createAcademicPrompt';
+export { generateAcademicReviewObject, generateAcademicReviewText } from './generateAcademicReview';
+
 /**
  * Generic retry function with exponential backoff
  */
@@ -61,7 +65,7 @@ type ParsedPullRequestFile = Omit<PullRequestFile, "patch"> & {
     patch: ParsedDiff[];
 };
 
-type GenerateReviewCommentFnParams = {
+export type GenerateReviewCommentFnParams = {
     modelCode: string;
     userPrompt: string;
 }
@@ -86,10 +90,11 @@ interface ReviewBotOptions {
     modelCode: string;
     generateReviewCommentFn: GenerateReviewCommentFn
     postReviewCommentFn: PostReviewCommentFn;
+    createPromptFn?: typeof createReviewPrompt;
 }
 
-type GenerateReviewCommentFn = (params: GenerateReviewCommentFnParams) => Promise<ReviewCommentContent>
-type ReviewCommentContent = Pick<RestEndpointMethodTypes["pulls"]["createReview"]["parameters"], "body" | "comments">
+export type GenerateReviewCommentFn = (params: GenerateReviewCommentFnParams) => Promise<ReviewCommentContent>
+export type ReviewCommentContent = Pick<RestEndpointMethodTypes["pulls"]["createReview"]["parameters"], "body" | "comments">
 
 /**
  * GitHub の PR 情報を取得
@@ -166,7 +171,7 @@ export function createReviewPrompt({
     language: string;
 }): string {
     return `
-You're a sophisticated software engineer.
+You are an experienced professor in the School of Science and Engineering.
 Please review the code changes in the following Pull Request and point out potential problems or areas for improvement only if they are significant.
 Important rules about the diff format:
 - Lines that begin with "-" are lines that have been **removed** in this Pull Request.
@@ -418,6 +423,7 @@ export async function runReviewBotVercelAI({
     modelCode,
     generateReviewCommentFn,
     postReviewCommentFn,
+    createPromptFn = createReviewPrompt,
 }: ReviewBotOptions) {
     try {
         const octokit = new Octokit({ auth: githubToken });
@@ -438,7 +444,7 @@ export async function runReviewBotVercelAI({
         const diffText = createParsedDiffText(parsedFilesData);
 
         // 6. プロンプトの生成
-        const userPrompt = createReviewPrompt({
+        const userPrompt = createPromptFn({
             prTitle: prData.title,
             prBody: prData.body,
             diffText,
