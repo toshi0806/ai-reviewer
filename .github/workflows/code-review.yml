@@ -1,0 +1,29 @@
+name: "AI Code Review"
+
+permissions:
+  pull-requests: write
+  contents: read
+
+on:
+  pull_request:
+    paths:
+      - 'src/**/*.ts'
+      - 'src/**/*.js'
+      - '**/*.json'
+      - '**/*.yml'
+      - '**/*.yaml'
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+jobs:
+  code-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gemini Code Review Bot
+        uses: Nasubikun/ai-reviewer@v1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          LANGUAGE: "English"
+          EXCLUDE_PATHS: "node_modules/**,dist/**,*.lock,*.log"
+          MODEL_CODE: "models/gemini-2.5-flash-preview-04-17"
