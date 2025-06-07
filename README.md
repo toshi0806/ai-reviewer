@@ -3,6 +3,8 @@
 
 This is an AI-powered academic paper review bot using generative AI, designed to help engineering faculty provide educational feedback on student papers.
 
+> **Based on [Nasubikun/ai-reviewer](https://github.com/Nasubikun/ai-reviewer)** - Extended for academic paper review functionality.
+
 ## Usage
 
 Place a file (e.g., `ai-reviewer.yml`) in the `.github/workflows` directory with the following content:
@@ -35,7 +37,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           LANGUAGE: "Japanese"
           EXCLUDE_PATHS: "*.bib,*.sty,*.cls,*.bbl,*.aux"
-          MODEL_CODE: "models/gemini-2.5-flash-preview-04-17"
+          MODEL_CODE: "models/gemini-2.0-flash"
           REVIEW_MODE: "ACADEMIC"
 ```
 Then, set your Google AI Studio Gemini API Key as GEMINI_API_KEY in your repository's GitHub Secrets.
@@ -59,7 +61,7 @@ You can fine-tune how reviews are performed by setting the following environment
 |--------------------------|------------|----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **EXCLUDE_PATHS**        | false       | -                                | 	Specify file paths or directories to exclude from reviews, separated by commas. Example: `*.bib,*.sty,*.cls`<br>Files matching these paths will not be reviewed.                                    |
 | **LANGUAGE**             | false       | `English`                        | Specifies the language of the AI-generated feedback (Example: `Japanese`, `English`).                                                                                                          |
-| **MODEL_CODE**           | false       | `models/gemini-2.5-flash-preview-04-17`    | The Gemini model to use. Please set a valid model code that is available in AI Studio.                                                                                             |
+| **MODEL_CODE**           | false       | `models/gemini-2.0-flash`    | The Gemini model to use. Please set a valid model code that is available in AI Studio.                                                                                             |
 | **REVIEW_MODE**          | false       | `CODE`                           | Review mode: `ACADEMIC` for academic papers, `CODE` for code reviews.                                                                                              |
 | **USE_SINGLE_COMMENT_REVIEW** | false | `false`                          | When set to true, posts all review results in a single comment with overall feedback. When false, posts line-specific comments.                                                              |
 
@@ -90,3 +92,34 @@ The bot reviews papers from the following perspectives:
    - Citation format consistency
    - Figure and table numbering and captions
    - Completeness of reference list
+
+## API Key Setup
+
+1. Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Sign in with your Google account
+3. Click "Get API key"
+4. Copy the generated API key
+5. Go to your GitHub repository Settings → Secrets and variables → Actions
+6. Click "New repository secret"
+7. Name: `GEMINI_API_KEY`, Value: your copied API key
+
+## Supported File Formats
+
+- LaTeX files (`.tex`)
+- Markdown files (`.md`)
+
+## Troubleshooting
+
+### API Key Errors
+- Verify `GEMINI_API_KEY` is correctly set in GitHub Secrets
+- Check for typos in the API key
+- Confirm the API key is active in Google AI Studio
+
+### Review Not Running
+- Verify file paths match trigger conditions
+- Check if target files are excluded by `EXCLUDE_PATHS`
+- Ensure GitHub Actions is enabled
+
+## License
+
+ISC License - see [LICENSE](LICENSE) file for details.

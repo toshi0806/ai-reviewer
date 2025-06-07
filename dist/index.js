@@ -8,7 +8,7 @@ const REPO = process.env.GITHUB_REPO;
 const EXCLUDE_PATHS = ((_a = process.env.EXCLUDE_PATHS) === null || _a === void 0 ? void 0 : _a.split(',').map(p => p.trim())) || [];
 const LANGUAGE = process.env.LANGUAGE || "English";
 const PR_NUMBER = Number(process.env.GITHUB_PR_NUMBER) || 1;
-const MODEL_CODE = process.env.MODEL_CODE || "models/gemini-2.0-flash-exp";
+const MODEL_CODE = process.env.MODEL_CODE || "models/gemini-2.0-flash";
 const USE_SINGLE_COMMENT_REVIEW = process.env.USE_SINGLE_COMMENT_REVIEW || false;
 const REVIEW_MODE = process.env.REVIEW_MODE || "CODE";
 if (!GITHUB_TOKEN) {
