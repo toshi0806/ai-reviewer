@@ -16,7 +16,7 @@ const REPO = process.env.GITHUB_REPO
 const EXCLUDE_PATHS = process.env.EXCLUDE_PATHS?.split(',').map(p => p.trim()) || [];
 const LANGUAGE = process.env.LANGUAGE || "English"
 const PR_NUMBER = Number(process.env.GITHUB_PR_NUMBER) || 1;
-const MODEL_CODE = process.env.MODEL_CODE || "models/gemini-2.5-flash-preview-04-17"
+const MODEL_CODE = process.env.MODEL_CODE || "models/gemini-2.0-flash"
 const REVIEW_MODE = process.env.REVIEW_MODE || "CODE"
 
 if (!GITHUB_TOKEN) {

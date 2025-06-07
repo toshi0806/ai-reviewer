@@ -40,4 +40,4 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           LANGUAGE: "English"
           EXCLUDE_PATHS: "node_modules/**,dist/**,*.lock,*.log"
-          MODEL_CODE: "models/gemini-2.5-flash-preview-04-17"
+          MODEL_CODE: "models/gemini-2.0-flash"

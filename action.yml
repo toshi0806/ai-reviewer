@@ -15,7 +15,7 @@ inputs:
     required: true
   MODEL_CODE:
     description: "Model code for Gemini"
-    default: "models/gemini-2.0-flash-exp"
+    default: "models/gemini-2.0-flash"
   LANGUAGE:
     description: "Preferred language for review comments"
     default: "English"
@@ -27,6 +27,10 @@ inputs:
     description: "Review mode: ACADEMIC for academic papers, CODE for code reviews"
     required: false
     default: "CODE"
+  USE_SINGLE_COMMENT_REVIEW:
+    description: "When set to true, posts all review results in a single comment. When false, posts line-specific comments."
+    required: false
+    default: "false"
 
 runs:
   using: "composite"
@@ -53,3 +57,4 @@ runs:
         MODEL_CODE: ${{ inputs.MODEL_CODE }}
         EXCLUDE_PATHS: ${{ inputs.EXCLUDE_PATHS }}
         REVIEW_MODE: ${{ inputs.REVIEW_MODE }}
+        USE_SINGLE_COMMENT_REVIEW: ${{ inputs.USE_SINGLE_COMMENT_REVIEW }}
