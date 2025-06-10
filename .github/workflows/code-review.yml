@@ -12,6 +12,7 @@ on:
       - '**/*.json'
       - '**/*.yml'
       - '**/*.yaml'
+      - '**/*.md'
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 

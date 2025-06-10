@@ -28,7 +28,7 @@ inputs:
     required: false
     default: "CODE"
   USE_SINGLE_COMMENT_REVIEW:
-    description: "When set to true, posts all review results in a single comment. When false, posts line-specific comments."
+    description: "When true, posts all review results in a single comment. When false, posts line-specific comments."
     required: false
     default: "false"
 
