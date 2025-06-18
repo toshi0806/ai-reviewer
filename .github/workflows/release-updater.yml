@@ -1,3 +1,4 @@
+---
 name: Move Major Release Tag
 on:
   release:
