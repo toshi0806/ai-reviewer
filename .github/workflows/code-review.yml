@@ -1,3 +1,4 @@
+---
 name: "AI Code Review"
 
 permissions:
@@ -33,7 +34,6 @@ jobs:
             exit 1
           fi
           echo "✅ GEMINI_API_KEY is configured"
-      
       - name: Gemini Code Review Bot
         uses: Nasubikun/ai-reviewer@v1
         with:
