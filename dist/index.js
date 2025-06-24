@@ -9,7 +9,7 @@ const EXCLUDE_PATHS = ((_a = process.env.EXCLUDE_PATHS) === null || _a === void 
 const LANGUAGE = process.env.LANGUAGE || "English";
 const PR_NUMBER = Number(process.env.GITHUB_PR_NUMBER) || 1;
 const MODEL_CODE = process.env.MODEL_CODE || "models/gemini-2.0-flash-exp";
-const USE_SINGLE_COMMENT_REVIEW = process.env.USE_SINGLE_COMMENT_REVIEW || false;
+const USE_SINGLE_COMMENT_REVIEW = process.env.USE_SINGLE_COMMENT_REVIEW === 'true';
 if (!GITHUB_TOKEN) {
     throw new Error("GITHUB_TOKEN is missing");
 }
