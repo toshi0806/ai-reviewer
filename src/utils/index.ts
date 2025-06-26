@@ -181,7 +181,7 @@ Important rules about the diff format:
 Review guidelines:
 - Ignore changes that only involve whitespace, indentation, or formatting that do not affect the code's behavior.
 - Do not add any review comments for trivial or non-impactful changes (e.g., variable-name changes that do not affect logic).
-- For suggestions, assign a priority. Only the following labels are allowed: PRIORITY:HIGH, PRIORITY:MEDIUM, PRIORITY:LOW, or POSITIVE.
+- For suggestions, assign a priority. Only the following labels are allowed: HIGH, MEDIUM, LOW, or POSITIVE.
 - Use type=POSITIVE only for changes that bring a clear, significant improvement to readability, performance, or maintainability. If a change is merely “not a problem,” do not comment on it.
 - Your review must be written in ${language}.
 
