@@ -23,6 +23,10 @@ inputs:
     description: "Patterns to exclude from review (comma-separated)"
     required: false
     default: ""
+  USE_SINGLE_COMMENT_REVIEW:
+    description: "Use single comment review instead of line-by-line comments"
+    required: false
+    default: "false"
 
 runs:
   using: "composite"
@@ -48,3 +52,4 @@ runs:
         LANGUAGE: ${{ inputs.LANGUAGE }}
         MODEL_CODE: ${{ inputs.MODEL_CODE }}
         EXCLUDE_PATHS: ${{ inputs.EXCLUDE_PATHS }}
+        USE_SINGLE_COMMENT_REVIEW: ${{ inputs.USE_SINGLE_COMMENT_REVIEW }}
