@@ -6,11 +6,13 @@ export function createAcademicReviewPrompt({
     prBody,
     diffText,
     language,
+    repoName,
 }: {
     prTitle: string;
     prBody: string | null;
     diffText: string;
     language: string;
+    repoName?: string;
 }): string {
     return `
 You are an experienced faculty member in the School of Science and Engineering.
@@ -39,7 +41,8 @@ Review perspectives:
    
 4. Research novelty and contribution
    - Clear differentiation from existing research
-   - Explanation of research significance and contributions
+   - Explanation of research significance and contributions${repoName?.match(/smkwlab\/.*-sotsuron$/) ? `
+   - Note: For undergraduate thesis work, moderate novelty expectations are appropriate` : ''}
    
 5. Formal requirements
    - Citation format consistency
@@ -55,7 +58,9 @@ Feedback priority levels:
 Important instructions:
 - Provide educational and constructive feedback
 - Offer specific improvement suggestions
-- Minimize mere grammar or notation corrections
+- Minimize mere grammar or notation corrections${repoName?.match(/smkwlab\/.*-sotsuron$/) ? `
+- For undergraduate thesis: Focus on fundamental research skills rather than groundbreaking novelty
+- Emphasize learning outcomes and research process understanding` : ''}
 - Write feedback in ${language}
 
 Paper Title: ${prTitle}

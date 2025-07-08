@@ -90,7 +90,13 @@ interface ReviewBotOptions {
     modelCode: string;
     generateReviewCommentFn: GenerateReviewCommentFn
     postReviewCommentFn: PostReviewCommentFn;
-    createPromptFn?: typeof createReviewPrompt;
+    createPromptFn?: (params: {
+        prTitle: string;
+        prBody: string | null;
+        diffText: string;
+        language: string;
+        repoName?: string;
+    }) => string;
 }
 
 export type GenerateReviewCommentFn = (params: GenerateReviewCommentFnParams) => Promise<ReviewCommentContent>
@@ -164,11 +170,13 @@ export function createReviewPrompt({
     prBody,
     diffText,
     language,
+    repoName,
 }: {
     prTitle: string;
     prBody: string | null;
     diffText: string;
     language: string;
+    repoName?: string;
 }): string {
     return `
 You are an experienced professor in the School of Science and Engineering.
@@ -449,6 +457,7 @@ export async function runReviewBotVercelAI({
             prBody: prData.body,
             diffText,
             language,
+            repoName: `${owner}/${repo}`,
         });
 
         console.log("--- Prompt ---");
