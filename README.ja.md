@@ -23,12 +23,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Gemini Review Bot
-        uses: Nasubikun/ai-reviewer@v1
+        uses: toshi0806/ai-reviewer@v1
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           LANGUAGE: "Japanese"
           EXCLUDE_PATHS: "**/pnpm-lock.yaml"
+          MODEL_CODE: "models/gemini-2.5-flash-lite"
 ```
 Github Secretsに`GEMINI_API_KEY`としてGoogle AI StudioのGemini API Keyを設定します。
 
@@ -40,5 +41,5 @@ Github Secretsに`GEMINI_API_KEY`としてGoogle AI StudioのGemini API Keyを�
 |--------------------------|------------|----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **EXCLUDE_PATHS**        | false       | -                                | レビューから除外したいファイルパスやディレクトリをカンマ区切りで指定します。例: `src/vendor,**/dist/*`<br>ここで指定されたパスに該当するファイルはレビューの対象外となります。                                    |
 | **LANGUAGE**             | false       | `English`                        | AIが生成するコメントの言語を指定します。例: `Japanese`, `English`など。                                                                                                          |                                                                                       |
-| **MODEL_CODE**           | false       | `models/gemini-2.5-flash-preview-04-17`    | 使用するGeminiモデルの指定です。AI Studioで利用できるモデルコードを設定してください。                                                                                             |
+| **MODEL_CODE**           | false       | `models/gemini-2.5-flash`    | 使用するGeminiモデルの指定です。AI Studioで利用できるモデルコードを設定してください。                                                                                             |
 | **USE_SINGLE_COMMENT_REVIEW** | false | `false`                          | `true`に設定すると、1つのコメントにまとめてレビュー結果を投稿します。<br>`false`の場合は差分にコメントをつける形で複数に分けて投稿します。                                                              |
