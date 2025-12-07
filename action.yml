@@ -15,7 +15,7 @@ inputs:
     required: true
   MODEL_CODE:
     description: "Model code for Gemini"
-    default: "models/gemini-2.0-flash-exp"
+    default: "models/gemini-2.5-flash"
   LANGUAGE:
     description: "Preferred language for review comments"
     default: "English"
