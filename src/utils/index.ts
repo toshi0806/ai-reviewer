@@ -189,6 +189,33 @@ ${diffText}
 `;
 }
 
+/**
+ * createReview の 422 レスポンスが「行解決失敗」由来かどうかを判定する。
+ * 他の 422 (path 不正、権限、schema 変更等) を握り潰さないため、
+ * フォールバックはこの判定が真の場合に限る。
+ *
+ * GitHub から返る errors は文字列配列の場合と
+ * `{ resource, code, field, message }` 形式の場合がある。
+ */
+function isLineResolutionError(error: any): boolean {
+    const errors = error?.response?.data?.errors ?? error?.errors;
+    const candidates: string[] = [];
+    if (Array.isArray(errors)) {
+        for (const e of errors) {
+            if (typeof e === "string") {
+                candidates.push(e);
+            } else if (e && typeof e === "object") {
+                if (typeof e.message === "string") candidates.push(e.message);
+                if (typeof e.code === "string") candidates.push(e.code);
+            }
+        }
+    }
+    if (typeof error?.response?.data?.message === "string") {
+        candidates.push(error.response.data.message);
+    }
+    return candidates.some((c) => /line could not be resolved/i.test(c));
+}
+
 /** 実際に GitHub に投稿する関数 */
 export const realPostReviewComment: PostReviewCommentFn = async (params) => {
     const { octokit, owner, repo, pullNumber, reviewCommentContent } = params;
@@ -204,13 +231,14 @@ export const realPostReviewComment: PostReviewCommentFn = async (params) => {
         // GitHub の createReview API はリクエスト中の comments の一つでも
         // diff の範囲外行を指していると "Line could not be resolved" で
         // 422 を返し、全体（body 含む）を捨てる。inline コメントを諦めて
-        // 本文だけでも投稿できるよう一度だけリトライする。
+        // 本文だけでも投稿できるよう一度だけリトライする。それ以外の 422
+        // (path 不正・権限・schema 変更等) は握り潰さず rethrow する。
         const status = error?.status ?? error?.response?.status;
         const hasInlineComments = (reviewCommentContent.comments?.length ?? 0) > 0;
-        if (status === 422 && hasInlineComments) {
+        if (status === 422 && hasInlineComments && isLineResolutionError(error)) {
             const detail = error?.response?.data?.errors ?? error?.errors ?? error?.message;
             console.warn(
-                "createReview rejected with 422; retrying without inline comments.",
+                "createReview rejected with 422 (line resolution); retrying without inline comments.",
                 detail,
             );
             const fallbackBody =
@@ -359,10 +387,12 @@ export const generateReviewCommentObject: GenerateReviewCommentFn = async (param
             ),
         line: z
             .number()
+            .int()
             .positive()
             .describe(
                 "The 1-based line number where the comment is placed. " +
-                "This corresponds to the modified (new) line in the diff or the final file."
+                "This must be a positive integer corresponding to the modified " +
+                "(new) line in the diff or the final file."
             ),
         priority: z
             .enum(["HIGH", "MEDIUM", "LOW", "POSITIVE"])
@@ -517,25 +547,39 @@ function sanitizeReviewCommentContent(
     }
 
     const validLines = computeValidRightSideLines(parsedFiles);
+    // GitHub の line は正の有限整数のみ受け付ける。Zod の `.int()` で
+    // 入口は塞いだが、フォールバック生成や将来のスキーマ変更で
+    // NaN / Infinity / 小数が流入しても弾けるよう投稿直前にも検証する。
     const candidates = comments.filter(
         (c): c is InlineReviewComment =>
             typeof c.path === "string" &&
+            typeof c.body === "string" &&
             typeof c.line === "number" &&
-            typeof c.body === "string",
+            Number.isInteger(c.line) &&
+            c.line > 0,
     );
+    const malformedCount = comments.length - candidates.length;
     const { kept, dropped } = partitionCommentsByLineValidity(candidates, validLines);
+    const totalDropped = malformedCount + dropped.length;
 
-    if (dropped.length === 0) {
+    if (totalDropped === 0) {
         return reviewCommentContent;
     }
 
-    console.warn(
-        `Dropping ${dropped.length} AI-generated inline comment(s) that target lines outside the diff:`,
-        dropped.map((c) => `${c.path}:${c.line}`),
-    );
+    if (malformedCount > 0) {
+        console.warn(
+            `Dropping ${malformedCount} AI-generated inline comment(s) with malformed path/line/body fields.`,
+        );
+    }
+    if (dropped.length > 0) {
+        console.warn(
+            `Dropping ${dropped.length} AI-generated inline comment(s) that target lines outside the diff:`,
+            dropped.map((c) => `${c.path}:${c.line}`),
+        );
+    }
 
     const note =
-        `\n\n---\n_Note: ${dropped.length} AI-generated inline comment(s) were skipped because they targeted lines outside the diff._`;
+        `\n\n---\n_Note: ${totalDropped} AI-generated inline comment(s) were skipped (either malformed or targeting lines outside the diff)._`;
     return {
         ...reviewCommentContent,
         body: (reviewCommentContent.body ?? "") + note,
