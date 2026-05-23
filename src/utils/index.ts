@@ -464,10 +464,14 @@ export function computeValidRightSideLines(
                 let newLine = hunk.newStart;
                 for (const rawLine of hunk.lines) {
                     const prefix = rawLine[0];
+                    // 右側に存在する行 ('+' 追加 / ' ' 文脈) のみが
+                    // インラインコメントの有効なターゲットになり、
+                    // 同時に右側の行カウンタを進める。
+                    // '-' (削除) は右側に出ない。
+                    // '\' (e.g. "\ No newline at end of file") は
+                    // 行ではなくメタ情報なのでカウンタも進めない。
                     if (prefix === "+" || prefix === " ") {
                         validLines.add(newLine);
-                    }
-                    if (prefix !== "-") {
                         newLine++;
                     }
                 }
