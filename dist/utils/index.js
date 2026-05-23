@@ -16,6 +16,8 @@ exports.filterFiles = filterFiles;
 exports.parseFiles = parseFiles;
 exports.createReviewPrompt = createReviewPrompt;
 exports.createParsedDiffText = createParsedDiffText;
+exports.computeValidRightSideLines = computeValidRightSideLines;
+exports.partitionCommentsByLineValidity = partitionCommentsByLineValidity;
 exports.runReviewBotVercelAI = runReviewBotVercelAI;
 const ai_1 = require("ai");
 const google_1 = require("@ai-sdk/google");
@@ -121,11 +123,71 @@ Diffs:
 ${diffText}
 `;
 }
+/**
+ * createReview の 422 レスポンスが「行解決失敗」由来かどうかを判定する。
+ * 他の 422 (path 不正、権限、schema 変更等) を握り潰さないため、
+ * フォールバックはこの判定が真の場合に限る。
+ *
+ * GitHub から返る errors は文字列配列の場合と
+ * `{ resource, code, field, message }` 形式の場合がある。
+ */
+function isLineResolutionError(error) {
+    var _a, _b, _c, _d, _e;
+    const errors = (_c = (_b = (_a = error === null || error === void 0 ? void 0 : error.response) === null || _a === void 0 ? void 0 : _a.data) === null || _b === void 0 ? void 0 : _b.errors) !== null && _c !== void 0 ? _c : error === null || error === void 0 ? void 0 : error.errors;
+    const candidates = [];
+    if (Array.isArray(errors)) {
+        for (const e of errors) {
+            if (typeof e === "string") {
+                candidates.push(e);
+            }
+            else if (e && typeof e === "object") {
+                if (typeof e.message === "string")
+                    candidates.push(e.message);
+                if (typeof e.code === "string")
+                    candidates.push(e.code);
+            }
+        }
+    }
+    if (typeof ((_e = (_d = error === null || error === void 0 ? void 0 : error.response) === null || _d === void 0 ? void 0 : _d.data) === null || _e === void 0 ? void 0 : _e.message) === "string") {
+        candidates.push(error.response.data.message);
+    }
+    return candidates.some((c) => /line could not be resolved/i.test(c));
+}
 /** 実際に GitHub に投稿する関数 */
 const realPostReviewComment = (params) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     const { octokit, owner, repo, pullNumber, reviewCommentContent } = params;
-    yield octokit.pulls.createReview(Object.assign({ owner,
-        repo, pull_number: pullNumber, event: "COMMENT" }, reviewCommentContent));
+    try {
+        yield octokit.pulls.createReview(Object.assign({ owner,
+            repo, pull_number: pullNumber, event: "COMMENT" }, reviewCommentContent));
+    }
+    catch (error) {
+        // GitHub の createReview API はリクエスト中の comments の一つでも
+        // diff の範囲外行を指していると "Line could not be resolved" で
+        // 422 を返し、全体（body 含む）を捨てる。inline コメントを諦めて
+        // 本文だけでも投稿できるよう一度だけリトライする。それ以外の 422
+        // (path 不正・権限・schema 変更等) は握り潰さず rethrow する。
+        const status = (_a = error === null || error === void 0 ? void 0 : error.status) !== null && _a !== void 0 ? _a : (_b = error === null || error === void 0 ? void 0 : error.response) === null || _b === void 0 ? void 0 : _b.status;
+        const hasInlineComments = ((_d = (_c = reviewCommentContent.comments) === null || _c === void 0 ? void 0 : _c.length) !== null && _d !== void 0 ? _d : 0) > 0;
+        if (status === 422 && hasInlineComments && isLineResolutionError(error)) {
+            const detail = (_h = (_g = (_f = (_e = error === null || error === void 0 ? void 0 : error.response) === null || _e === void 0 ? void 0 : _e.data) === null || _f === void 0 ? void 0 : _f.errors) !== null && _g !== void 0 ? _g : error === null || error === void 0 ? void 0 : error.errors) !== null && _h !== void 0 ? _h : error === null || error === void 0 ? void 0 : error.message;
+            console.warn("createReview rejected with 422 (line resolution); retrying without inline comments.", detail);
+            const fallbackBody = ((_j = reviewCommentContent.body) !== null && _j !== void 0 ? _j : "") +
+                "\n\n---\n" +
+                "_Note: inline review comments were dropped because GitHub rejected them with 422 (\"Line could not be resolved\"). " +
+                "This typically happens when the AI proposes a line number that does not appear on the right side of the diff._";
+            yield octokit.pulls.createReview({
+                owner,
+                repo,
+                pull_number: pullNumber,
+                event: "COMMENT",
+                body: fallbackBody,
+            });
+        }
+        else {
+            throw error;
+        }
+    }
 });
 exports.realPostReviewComment = realPostReviewComment;
 /** dryRun用の疑似投稿関数 */
@@ -158,13 +220,21 @@ function formatHunkWithLineNumbers(hunk) {
                 lineNumbers = `     ${newLine.toString().padStart(4, " ")}`;
                 newLine++;
                 break;
-            default:
-                // コンテキスト行の場合: oldLine/newLine 両方をインクリメント
+            case " ":
+                // コンテキスト行: oldLine / newLine 両方をインクリメント
                 lineNumbers = `${oldLine.toString().padStart(4, " ")} ${newLine
                     .toString()
                     .padStart(4, " ")}`;
                 oldLine++;
                 newLine++;
+                break;
+            default:
+                // メタ行 (e.g. "\ No newline at end of file")。
+                // 実在の行ではないのでカウンタは進めない。
+                // AI が誤って line 番号を取らないよう数字は出さず空白で埋める。
+                // computeValidRightSideLines も同じ前提で右側カウンタを
+                // 進めないため、両者の行番号観が一致する。
+                lineNumbers = "         ";
                 break;
         }
         return `${lineNumbers} | ${line}`;
@@ -235,9 +305,11 @@ const generateReviewCommentObject = (params) => __awaiter(void 0, void 0, void 0
             "This message should clearly explain the suggestion or feedback related to that line."),
         line: zod_1.z
             .number()
+            .int()
             .positive()
             .describe("The 1-based line number where the comment is placed. " +
-            "This corresponds to the modified (new) line in the diff or the final file."),
+            "This must be a positive integer corresponding to the modified " +
+            "(new) line in the diff or the final file."),
         priority: zod_1.z
             .enum(["HIGH", "MEDIUM", "LOW", "POSITIVE"])
             .describe("The priority of this fix. For suggestions, set its priority as like 'HIGH', 'MEDIUM', or 'LOW'. For positive comments, it should be 'POSITIVE'."),
@@ -297,6 +369,93 @@ const generateReviewCommentObject = (params) => __awaiter(void 0, void 0, void 0
     }
 });
 exports.generateReviewCommentObject = generateReviewCommentObject;
+/**
+ * 各ファイルについて、GitHub の createReview API が
+ * インラインコメントのターゲットとして受け付ける
+ * "右側 (newStart 以降の)" 行番号集合を計算する。
+ *
+ * GitHub の Reviews API は line が hunk 上の `+` または ` ` 行に
+ * 落ちないと "Line could not be resolved" で 422 を返し、
+ * 一件でも違反があると body を含む review 全体が棄却される。
+ */
+function computeValidRightSideLines(files) {
+    const result = new Map();
+    for (const file of files) {
+        const validLines = new Set();
+        for (const diff of file.patch) {
+            for (const hunk of diff.hunks) {
+                let newLine = hunk.newStart;
+                for (const rawLine of hunk.lines) {
+                    const prefix = rawLine[0];
+                    // 右側に存在する行 ('+' 追加 / ' ' 文脈) のみが
+                    // インラインコメントの有効なターゲットになり、
+                    // 同時に右側の行カウンタを進める。
+                    // '-' (削除) は右側に出ない。
+                    // '\' (e.g. "\ No newline at end of file") は
+                    // 行ではなくメタ情報なのでカウンタも進めない。
+                    if (prefix === "+" || prefix === " ") {
+                        validLines.add(newLine);
+                        newLine++;
+                    }
+                }
+            }
+        }
+        result.set(file.filename, validLines);
+    }
+    return result;
+}
+/**
+ * AI が生成したインラインコメントを diff 上で投稿可能なものに絞り込み、
+ * 不可なものは別配列で返す。
+ */
+function partitionCommentsByLineValidity(comments, validLines) {
+    const kept = [];
+    const dropped = [];
+    for (const comment of comments) {
+        const allowed = validLines.get(comment.path);
+        if (allowed && allowed.has(comment.line)) {
+            kept.push(comment);
+        }
+        else {
+            dropped.push(comment);
+        }
+    }
+    return { kept, dropped };
+}
+/**
+ * AI 返却の review 内容を、現在の diff に基づいて
+ * 投稿可能な形に整形する。落とした件数を body の脚注に追記。
+ */
+function sanitizeReviewCommentContent(reviewCommentContent, parsedFiles) {
+    var _a;
+    const comments = reviewCommentContent.comments;
+    if (!comments || comments.length === 0) {
+        return reviewCommentContent;
+    }
+    const validLines = computeValidRightSideLines(parsedFiles);
+    // GitHub の line は正の有限整数のみ受け付ける。Zod の `.int()` で
+    // 入口は塞いだが、フォールバック生成や将来のスキーマ変更で
+    // NaN / Infinity / 小数が流入しても弾けるよう投稿直前にも検証する。
+    const candidates = comments.filter((c) => typeof c.path === "string" &&
+        typeof c.body === "string" &&
+        typeof c.line === "number" &&
+        Number.isInteger(c.line) &&
+        c.line > 0);
+    const malformedCount = comments.length - candidates.length;
+    const { kept, dropped } = partitionCommentsByLineValidity(candidates, validLines);
+    const totalDropped = malformedCount + dropped.length;
+    if (totalDropped === 0) {
+        return reviewCommentContent;
+    }
+    if (malformedCount > 0) {
+        console.warn(`Dropping ${malformedCount} AI-generated inline comment(s) with malformed path/line/body fields.`);
+    }
+    if (dropped.length > 0) {
+        console.warn(`Dropping ${dropped.length} AI-generated inline comment(s) that target lines outside the diff:`, dropped.map((c) => `${c.path}:${c.line}`));
+    }
+    const note = `\n\n---\n_Note: ${totalDropped} AI-generated inline comment(s) were skipped (either malformed or targeting lines outside the diff)._`;
+    return Object.assign(Object.assign({}, reviewCommentContent), { body: ((_a = reviewCommentContent.body) !== null && _a !== void 0 ? _a : "") + note, comments: kept });
+}
 function runReviewBotVercelAI(_a) {
     return __awaiter(this, arguments, void 0, function* ({ githubToken, owner, repo, pullNumber, excludePaths, language, modelCode, generateReviewCommentFn, postReviewCommentFn, }) {
         try {
@@ -331,13 +490,16 @@ function runReviewBotVercelAI(_a) {
             }
             console.log("--- Review ---");
             console.log(reviewCommentContent);
+            // 7.5 AI が返した行番号が diff 上に存在しないと
+            // createReview が 422 で review 全体を棄却するため、事前に間引く。
+            const sanitizedContent = sanitizeReviewCommentContent(reviewCommentContent, parsedFilesData);
             // 8. GitHub にレビュー文を投稿
             yield postReviewCommentFn({
                 octokit,
                 owner,
                 repo,
                 pullNumber,
-                reviewCommentContent,
+                reviewCommentContent: sanitizedContent,
             });
         }
         catch (error) {

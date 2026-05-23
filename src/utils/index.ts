@@ -189,16 +189,74 @@ ${diffText}
 `;
 }
 
+/**
+ * createReview の 422 レスポンスが「行解決失敗」由来かどうかを判定する。
+ * 他の 422 (path 不正、権限、schema 変更等) を握り潰さないため、
+ * フォールバックはこの判定が真の場合に限る。
+ *
+ * GitHub から返る errors は文字列配列の場合と
+ * `{ resource, code, field, message }` 形式の場合がある。
+ */
+function isLineResolutionError(error: any): boolean {
+    const errors = error?.response?.data?.errors ?? error?.errors;
+    const candidates: string[] = [];
+    if (Array.isArray(errors)) {
+        for (const e of errors) {
+            if (typeof e === "string") {
+                candidates.push(e);
+            } else if (e && typeof e === "object") {
+                if (typeof e.message === "string") candidates.push(e.message);
+                if (typeof e.code === "string") candidates.push(e.code);
+            }
+        }
+    }
+    if (typeof error?.response?.data?.message === "string") {
+        candidates.push(error.response.data.message);
+    }
+    return candidates.some((c) => /line could not be resolved/i.test(c));
+}
+
 /** 実際に GitHub に投稿する関数 */
 export const realPostReviewComment: PostReviewCommentFn = async (params) => {
     const { octokit, owner, repo, pullNumber, reviewCommentContent } = params;
-    await octokit.pulls.createReview({
-        owner,
-        repo,
-        pull_number: pullNumber,
-        event: "COMMENT",
-        ...reviewCommentContent
-    });
+    try {
+        await octokit.pulls.createReview({
+            owner,
+            repo,
+            pull_number: pullNumber,
+            event: "COMMENT",
+            ...reviewCommentContent,
+        });
+    } catch (error: any) {
+        // GitHub の createReview API はリクエスト中の comments の一つでも
+        // diff の範囲外行を指していると "Line could not be resolved" で
+        // 422 を返し、全体（body 含む）を捨てる。inline コメントを諦めて
+        // 本文だけでも投稿できるよう一度だけリトライする。それ以外の 422
+        // (path 不正・権限・schema 変更等) は握り潰さず rethrow する。
+        const status = error?.status ?? error?.response?.status;
+        const hasInlineComments = (reviewCommentContent.comments?.length ?? 0) > 0;
+        if (status === 422 && hasInlineComments && isLineResolutionError(error)) {
+            const detail = error?.response?.data?.errors ?? error?.errors ?? error?.message;
+            console.warn(
+                "createReview rejected with 422 (line resolution); retrying without inline comments.",
+                detail,
+            );
+            const fallbackBody =
+                (reviewCommentContent.body ?? "") +
+                "\n\n---\n" +
+                "_Note: inline review comments were dropped because GitHub rejected them with 422 (\"Line could not be resolved\"). " +
+                "This typically happens when the AI proposes a line number that does not appear on the right side of the diff._";
+            await octokit.pulls.createReview({
+                owner,
+                repo,
+                pull_number: pullNumber,
+                event: "COMMENT",
+                body: fallbackBody,
+            });
+        } else {
+            throw error;
+        }
+    }
 }
 
 /** dryRun用の疑似投稿関数 */
@@ -236,13 +294,21 @@ function formatHunkWithLineNumbers(hunk: Hunk): string {
                 lineNumbers = `     ${newLine.toString().padStart(4, " ")}`;
                 newLine++;
                 break;
-            default:
-                // コンテキスト行の場合: oldLine/newLine 両方をインクリメント
+            case " ":
+                // コンテキスト行: oldLine / newLine 両方をインクリメント
                 lineNumbers = `${oldLine.toString().padStart(4, " ")} ${newLine
                     .toString()
                     .padStart(4, " ")}`;
                 oldLine++;
                 newLine++;
+                break;
+            default:
+                // メタ行 (e.g. "\ No newline at end of file")。
+                // 実在の行ではないのでカウンタは進めない。
+                // AI が誤って line 番号を取らないよう数字は出さず空白で埋める。
+                // computeValidRightSideLines も同じ前提で右側カウンタを
+                // 進めないため、両者の行番号観が一致する。
+                lineNumbers = "         ";
                 break;
         }
 
@@ -329,10 +395,12 @@ export const generateReviewCommentObject: GenerateReviewCommentFn = async (param
             ),
         line: z
             .number()
+            .int()
             .positive()
             .describe(
                 "The 1-based line number where the comment is placed. " +
-                "This corresponds to the modified (new) line in the diff or the final file."
+                "This must be a positive integer corresponding to the modified " +
+                "(new) line in the diff or the final file."
             ),
         priority: z
             .enum(["HIGH", "MEDIUM", "LOW", "POSITIVE"])
@@ -408,6 +476,125 @@ export const generateReviewCommentObject: GenerateReviewCommentFn = async (param
     }
 }
 
+type InlineReviewComment = {
+    path: string;
+    line: number;
+    body: string;
+};
+
+/**
+ * 各ファイルについて、GitHub の createReview API が
+ * インラインコメントのターゲットとして受け付ける
+ * "右側 (newStart 以降の)" 行番号集合を計算する。
+ *
+ * GitHub の Reviews API は line が hunk 上の `+` または ` ` 行に
+ * 落ちないと "Line could not be resolved" で 422 を返し、
+ * 一件でも違反があると body を含む review 全体が棄却される。
+ */
+export function computeValidRightSideLines(
+    files: ParsedPullRequestFile[],
+): Map<string, Set<number>> {
+    const result = new Map<string, Set<number>>();
+    for (const file of files) {
+        const validLines = new Set<number>();
+        for (const diff of file.patch) {
+            for (const hunk of diff.hunks) {
+                let newLine = hunk.newStart;
+                for (const rawLine of hunk.lines) {
+                    const prefix = rawLine[0];
+                    // 右側に存在する行 ('+' 追加 / ' ' 文脈) のみが
+                    // インラインコメントの有効なターゲットになり、
+                    // 同時に右側の行カウンタを進める。
+                    // '-' (削除) は右側に出ない。
+                    // '\' (e.g. "\ No newline at end of file") は
+                    // 行ではなくメタ情報なのでカウンタも進めない。
+                    if (prefix === "+" || prefix === " ") {
+                        validLines.add(newLine);
+                        newLine++;
+                    }
+                }
+            }
+        }
+        result.set(file.filename, validLines);
+    }
+    return result;
+}
+
+/**
+ * AI が生成したインラインコメントを diff 上で投稿可能なものに絞り込み、
+ * 不可なものは別配列で返す。
+ */
+export function partitionCommentsByLineValidity(
+    comments: InlineReviewComment[],
+    validLines: Map<string, Set<number>>,
+): { kept: InlineReviewComment[]; dropped: InlineReviewComment[] } {
+    const kept: InlineReviewComment[] = [];
+    const dropped: InlineReviewComment[] = [];
+    for (const comment of comments) {
+        const allowed = validLines.get(comment.path);
+        if (allowed && allowed.has(comment.line)) {
+            kept.push(comment);
+        } else {
+            dropped.push(comment);
+        }
+    }
+    return { kept, dropped };
+}
+
+/**
+ * AI 返却の review 内容を、現在の diff に基づいて
+ * 投稿可能な形に整形する。落とした件数を body の脚注に追記。
+ */
+function sanitizeReviewCommentContent(
+    reviewCommentContent: ReviewCommentContent,
+    parsedFiles: ParsedPullRequestFile[],
+): ReviewCommentContent {
+    const comments = reviewCommentContent.comments;
+    if (!comments || comments.length === 0) {
+        return reviewCommentContent;
+    }
+
+    const validLines = computeValidRightSideLines(parsedFiles);
+    // GitHub の line は正の有限整数のみ受け付ける。Zod の `.int()` で
+    // 入口は塞いだが、フォールバック生成や将来のスキーマ変更で
+    // NaN / Infinity / 小数が流入しても弾けるよう投稿直前にも検証する。
+    const candidates = comments.filter(
+        (c): c is InlineReviewComment =>
+            typeof c.path === "string" &&
+            typeof c.body === "string" &&
+            typeof c.line === "number" &&
+            Number.isInteger(c.line) &&
+            c.line > 0,
+    );
+    const malformedCount = comments.length - candidates.length;
+    const { kept, dropped } = partitionCommentsByLineValidity(candidates, validLines);
+    const totalDropped = malformedCount + dropped.length;
+
+    if (totalDropped === 0) {
+        return reviewCommentContent;
+    }
+
+    if (malformedCount > 0) {
+        console.warn(
+            `Dropping ${malformedCount} AI-generated inline comment(s) with malformed path/line/body fields.`,
+        );
+    }
+    if (dropped.length > 0) {
+        console.warn(
+            `Dropping ${dropped.length} AI-generated inline comment(s) that target lines outside the diff:`,
+            dropped.map((c) => `${c.path}:${c.line}`),
+        );
+    }
+
+    const note =
+        `\n\n---\n_Note: ${totalDropped} AI-generated inline comment(s) were skipped (either malformed or targeting lines outside the diff)._`;
+    return {
+        ...reviewCommentContent,
+        body: (reviewCommentContent.body ?? "") + note,
+        comments: kept,
+    };
+}
+
 export async function runReviewBotVercelAI({
     githubToken,
     owner,
@@ -460,13 +647,20 @@ export async function runReviewBotVercelAI({
         console.log("--- Review ---");
         console.log(reviewCommentContent);
 
+        // 7.5 AI が返した行番号が diff 上に存在しないと
+        // createReview が 422 で review 全体を棄却するため、事前に間引く。
+        const sanitizedContent = sanitizeReviewCommentContent(
+            reviewCommentContent,
+            parsedFilesData,
+        );
+
         // 8. GitHub にレビュー文を投稿
         await postReviewCommentFn({
             octokit,
             owner,
             repo,
             pullNumber,
-            reviewCommentContent,
+            reviewCommentContent: sanitizedContent,
         });
 
     } catch (error) {
