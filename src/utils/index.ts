@@ -192,13 +192,43 @@ ${diffText}
 /** 実際に GitHub に投稿する関数 */
 export const realPostReviewComment: PostReviewCommentFn = async (params) => {
     const { octokit, owner, repo, pullNumber, reviewCommentContent } = params;
-    await octokit.pulls.createReview({
-        owner,
-        repo,
-        pull_number: pullNumber,
-        event: "COMMENT",
-        ...reviewCommentContent
-    });
+    try {
+        await octokit.pulls.createReview({
+            owner,
+            repo,
+            pull_number: pullNumber,
+            event: "COMMENT",
+            ...reviewCommentContent,
+        });
+    } catch (error: any) {
+        // GitHub の createReview API はリクエスト中の comments の一つでも
+        // diff の範囲外行を指していると "Line could not be resolved" で
+        // 422 を返し、全体（body 含む）を捨てる。inline コメントを諦めて
+        // 本文だけでも投稿できるよう一度だけリトライする。
+        const status = error?.status ?? error?.response?.status;
+        const hasInlineComments = (reviewCommentContent.comments?.length ?? 0) > 0;
+        if (status === 422 && hasInlineComments) {
+            const detail = error?.response?.data?.errors ?? error?.errors ?? error?.message;
+            console.warn(
+                "createReview rejected with 422; retrying without inline comments.",
+                detail,
+            );
+            const fallbackBody =
+                (reviewCommentContent.body ?? "") +
+                "\n\n---\n" +
+                "_Note: inline review comments were dropped because GitHub rejected them with 422 (\"Line could not be resolved\"). " +
+                "This typically happens when the AI proposes a line number that does not appear on the right side of the diff._";
+            await octokit.pulls.createReview({
+                owner,
+                repo,
+                pull_number: pullNumber,
+                event: "COMMENT",
+                body: fallbackBody,
+            });
+        } else {
+            throw error;
+        }
+    }
 }
 
 /** dryRun用の疑似投稿関数 */
@@ -408,6 +438,107 @@ export const generateReviewCommentObject: GenerateReviewCommentFn = async (param
     }
 }
 
+type InlineReviewComment = {
+    path: string;
+    line: number;
+    body: string;
+};
+
+/**
+ * 各ファイルについて、GitHub の createReview API が
+ * インラインコメントのターゲットとして受け付ける
+ * "右側 (newStart 以降の)" 行番号集合を計算する。
+ *
+ * GitHub の Reviews API は line が hunk 上の `+` または ` ` 行に
+ * 落ちないと "Line could not be resolved" で 422 を返し、
+ * 一件でも違反があると body を含む review 全体が棄却される。
+ */
+export function computeValidRightSideLines(
+    files: ParsedPullRequestFile[],
+): Map<string, Set<number>> {
+    const result = new Map<string, Set<number>>();
+    for (const file of files) {
+        const validLines = new Set<number>();
+        for (const diff of file.patch) {
+            for (const hunk of diff.hunks) {
+                let newLine = hunk.newStart;
+                for (const rawLine of hunk.lines) {
+                    const prefix = rawLine[0];
+                    if (prefix === "+" || prefix === " ") {
+                        validLines.add(newLine);
+                    }
+                    if (prefix !== "-") {
+                        newLine++;
+                    }
+                }
+            }
+        }
+        result.set(file.filename, validLines);
+    }
+    return result;
+}
+
+/**
+ * AI が生成したインラインコメントを diff 上で投稿可能なものに絞り込み、
+ * 不可なものは別配列で返す。
+ */
+export function partitionCommentsByLineValidity(
+    comments: InlineReviewComment[],
+    validLines: Map<string, Set<number>>,
+): { kept: InlineReviewComment[]; dropped: InlineReviewComment[] } {
+    const kept: InlineReviewComment[] = [];
+    const dropped: InlineReviewComment[] = [];
+    for (const comment of comments) {
+        const allowed = validLines.get(comment.path);
+        if (allowed && allowed.has(comment.line)) {
+            kept.push(comment);
+        } else {
+            dropped.push(comment);
+        }
+    }
+    return { kept, dropped };
+}
+
+/**
+ * AI 返却の review 内容を、現在の diff に基づいて
+ * 投稿可能な形に整形する。落とした件数を body の脚注に追記。
+ */
+function sanitizeReviewCommentContent(
+    reviewCommentContent: ReviewCommentContent,
+    parsedFiles: ParsedPullRequestFile[],
+): ReviewCommentContent {
+    const comments = reviewCommentContent.comments;
+    if (!comments || comments.length === 0) {
+        return reviewCommentContent;
+    }
+
+    const validLines = computeValidRightSideLines(parsedFiles);
+    const candidates = comments.filter(
+        (c): c is InlineReviewComment =>
+            typeof c.path === "string" &&
+            typeof c.line === "number" &&
+            typeof c.body === "string",
+    );
+    const { kept, dropped } = partitionCommentsByLineValidity(candidates, validLines);
+
+    if (dropped.length === 0) {
+        return reviewCommentContent;
+    }
+
+    console.warn(
+        `Dropping ${dropped.length} AI-generated inline comment(s) that target lines outside the diff:`,
+        dropped.map((c) => `${c.path}:${c.line}`),
+    );
+
+    const note =
+        `\n\n---\n_Note: ${dropped.length} AI-generated inline comment(s) were skipped because they targeted lines outside the diff._`;
+    return {
+        ...reviewCommentContent,
+        body: (reviewCommentContent.body ?? "") + note,
+        comments: kept,
+    };
+}
+
 export async function runReviewBotVercelAI({
     githubToken,
     owner,
@@ -460,13 +591,20 @@ export async function runReviewBotVercelAI({
         console.log("--- Review ---");
         console.log(reviewCommentContent);
 
+        // 7.5 AI が返した行番号が diff 上に存在しないと
+        // createReview が 422 で review 全体を棄却するため、事前に間引く。
+        const sanitizedContent = sanitizeReviewCommentContent(
+            reviewCommentContent,
+            parsedFilesData,
+        );
+
         // 8. GitHub にレビュー文を投稿
         await postReviewCommentFn({
             octokit,
             owner,
             repo,
             pullNumber,
-            reviewCommentContent,
+            reviewCommentContent: sanitizedContent,
         });
 
     } catch (error) {
