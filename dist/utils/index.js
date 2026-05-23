@@ -220,13 +220,21 @@ function formatHunkWithLineNumbers(hunk) {
                 lineNumbers = `     ${newLine.toString().padStart(4, " ")}`;
                 newLine++;
                 break;
-            default:
-                // コンテキスト行の場合: oldLine/newLine 両方をインクリメント
+            case " ":
+                // コンテキスト行: oldLine / newLine 両方をインクリメント
                 lineNumbers = `${oldLine.toString().padStart(4, " ")} ${newLine
                     .toString()
                     .padStart(4, " ")}`;
                 oldLine++;
                 newLine++;
+                break;
+            default:
+                // メタ行 (e.g. "\ No newline at end of file")。
+                // 実在の行ではないのでカウンタは進めない。
+                // AI が誤って line 番号を取らないよう数字は出さず空白で埋める。
+                // computeValidRightSideLines も同じ前提で右側カウンタを
+                // 進めないため、両者の行番号観が一致する。
+                lineNumbers = "         ";
                 break;
         }
         return `${lineNumbers} | ${line}`;
